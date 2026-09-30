@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import doctorModelUrl from '../assets/DoctorBoy.glb';
+const doctorModelUrl = '/assets/boy.glb';
 import { DoctorBoyAnimationController } from './doctor/DoctorBoyAnimationController';
 import './PharmacyWelcomeAnimation.css';
 
