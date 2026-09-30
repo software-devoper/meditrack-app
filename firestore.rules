@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'mustak.office.use@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin')
+      );
+    }
+
+    // Metadata: connection test & sales invoice counter
+    match /metadata/{metaId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Users collection:
+    // Read is allowed so Login can look up username and Setup can check if initial account is required
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Products collection:
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Customers collection (patients and suppliers):
+    match /customers/{customerId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Doctors collection:
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Sales collection:
+    match /sales/{saleId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Purchases collection:
+    match /purchases/{purchaseId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Stock Ledger collection:
+    match /stockLedger/{ledgerId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Immutable ledger
+    }
+
+    // Default catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# AI Studio export artifacts (contain old credentials)
+firebase-applet-config.json
+metadata.json
+bun.lock
+test-tailwind.css

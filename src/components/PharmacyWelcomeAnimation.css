@@ -1,0 +1,207 @@
+/* PharmacyWelcomeAnimation.css - Modern Cinematic 3D Healthcare Scene */
+
+.pwa-stage-root {
+  position: relative;
+  width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f1f5f9;
+  background-image: 
+    radial-gradient(at 15% 20%, rgba(14, 165, 233, 0.2) 0px, transparent 45%),
+    radial-gradient(at 85% 25%, rgba(20, 184, 166, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 85%, rgba(16, 185, 129, 0.12) 0px, transparent 50%);
+  font-family: inherit;
+  color: #0f172a;
+}
+
+:global(.dark) .pwa-stage-root,
+.dark .pwa-stage-root {
+  background-color: #0b1120;
+  background-image: 
+    radial-gradient(at 15% 20%, rgba(14, 165, 233, 0.18) 0px, transparent 45%),
+    radial-gradient(at 85% 25%, rgba(20, 184, 166, 0.14) 0px, transparent 45%),
+    radial-gradient(at 50% 85%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+  color: #f8fafc;
+}
+
+/* Subtle Medical Atmosphere Grid */
+.pwa-stage-ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(203, 213, 225, 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(203, 213, 225, 0.6) 1px, transparent 1px);
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 85%);
+  opacity: 0.9;
+  z-index: 1;
+}
+
+:global(.dark) .pwa-stage-ambient,
+.dark .pwa-stage-ambient {
+  background-image: 
+    linear-gradient(to right, rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+}
+
+/* 3D WebGL Canvas Layer */
+.pwa-canvas-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Mouse move handled by window listener */
+  z-index: 5;
+}
+
+.pwa-canvas-layer canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Responsive Grid Container */
+.pwa-stage-container {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  justify-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@media (min-width: 1024px) {
+  .pwa-stage-container {
+    grid-template-columns: 1.15fr 0.85fr;
+    justify-items: stretch;
+    padding: 2rem 2.5rem;
+  }
+}
+
+.pwa-empty-space {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .pwa-empty-space {
+    display: block;
+    height: 100%;
+    pointer-events: none;
+  }
+}
+
+/* Sign-in Slot with smooth pull-out reveal */
+.pwa-login-slot {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.08));
+}
+
+:global(.dark) .pwa-login-slot,
+.dark .pwa-login-slot {
+  filter: drop-shadow(0 20px 35px rgba(0, 0, 0, 0.45));
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Floating Greeting Bubble */
+.pwa-greeting-bubble {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #0ea5e9;
+  box-shadow: 0 15px 35px -6px rgba(14, 165, 233, 0.3), 0 8px 15px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+:global(.dark) .pwa-greeting-bubble,
+.dark .pwa-greeting-bubble {
+  background: #0f172a;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 15px 40px -6px rgba(14, 165, 233, 0.45), 0 8px 15px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes bubblePop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bubblePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, floatGentle 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes floatGentle {
+  0% {
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    transform: translateX(-50%) translateY(-6px);
+  }
+}
+
+/* Interactive Posture Selector Controls */
+.pwa-posture-selector {
+  position: absolute;
+  bottom: 2rem;
+  left: 2.5rem;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 320px;
+  animation: bubblePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@media (max-width: 1023px) {
+  .pwa-posture-selector {
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+    max-width: 90vw;
+  }
+}
+
+.pwa-posture-pill {
+  cursor: pointer;
+  user-select: none;
+}
+
+

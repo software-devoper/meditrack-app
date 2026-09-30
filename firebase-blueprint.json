@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Internal staff and admin users",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the user" },
+        "username": { "type": "string", "description": "Unique username for login" },
+        "internalAuthEmail": { "type": "string", "description": "Private email used for Firebase Auth" },
+        "contactEmail": { "type": "string", "description": "Public contact email" },
+        "role": { "type": "string", "enum": ["admin", "staff"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["name", "username", "internalAuthEmail", "role", "isActive", "createdAt", "createdBy"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Medicine and inventory items",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "genericName": { "type": "string" },
+        "category": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "hsnCode": { "type": "string" },
+        "unit": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "mrp": { "type": "number" },
+        "gstPercent": { "type": "number" },
+        "stockQty": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "rackLocation": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "genericName", "category", "manufacturer", "hsnCode", "unit", "purchasePrice", "mrp", "gstPercent", "stockQty", "reorderLevel", "rackLocation", "createdAt", "updatedAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Patients and Suppliers (merged in 'customers' collection)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "type": { "type": "string", "enum": ["sale", "purchase"] },
+        "outstandingBalance": { "type": "number" },
+        "doctors": { "type": "array" },
+        "gstNumber": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["name", "phone", "address", "type", "outstandingBalance", "createdAt"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "External prescribing doctors",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["name", "phone", "address", "createdAt", "createdBy"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Stock purchase transactions",
+      "type": "object",
+      "properties": {
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "gstTotal": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Partial", "Due"] },
+        "amountPaid": { "type": "number" },
+        "date": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["supplierId", "supplierName", "items", "subtotal", "gstTotal", "grandTotal", "paymentStatus", "amountPaid", "date", "createdBy"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "POS sales transactions",
+      "type": "object",
+      "properties": {
+        "invoiceNo": { "type": "string" },
+        "billTo": { "type": "string" },
+        "patientName": { "type": "string" },
+        "customerName": { "type": "string" },
+        "patientPhone": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "patientAddress": { "type": "string" },
+        "customerAddress": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "doctorPhone": { "type": "string" },
+        "doctorAddress": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discountTotal": { "type": "number" },
+        "gstTotal": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "paymentMode": { "type": "string", "enum": ["Cash", "UPI", "Card", "Credit"] },
+        "date": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "status": { "type": "string", "enum": ["completed", "returned"] }
+      },
+      "required": ["invoiceNo", "items", "subtotal", "discountTotal", "gstTotal", "grandTotal", "paymentMode", "date", "createdBy", "status"]
+    },
+    "StockLedgerEntry": {
+      "title": "StockLedgerEntry",
+      "description": "History of stock changes",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "type": { "type": "string", "enum": ["purchase", "sale", "adjustment", "return"] },
+        "qtyChange": { "type": "number" },
+        "refCollection": { "type": "string", "enum": ["purchases", "sales", "manual"] },
+        "refId": { "type": "string" },
+        "reason": { "type": "string" },
+        "date": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["productId", "type", "qtyChange", "refCollection", "refId", "reason", "date", "createdBy"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "Application users" },
+    "products": { "schema": "Product", "description": "Inventory products" },
+    "customers": { "schema": "Customer", "description": "Patients and Suppliers" },
+    "doctors": { "schema": "Doctor", "description": "Prescribing doctors" },
+    "purchases": { "schema": "Purchase", "description": "Purchase logs" },
+    "sales": { "schema": "Sale", "description": "Sales logs" },
+    "stockLedger": { "schema": "StockLedgerEntry", "description": "Inventory movement" },
+    "metadata": { "schema": "object", "description": "System metadata (counters, etc)" }
+  }
+}
