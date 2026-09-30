@@ -12,3 +12,5 @@ firebase-applet-config.json
 metadata.json
 bun.lock
 test-tailwind.css
+
+.vercel
