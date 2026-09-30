@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 export const firebaseConfig = {
@@ -16,10 +16,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const isFirebaseConfigured = true;
 
-// Use initializeFirestore with experimentalForceLongPolling for robust connectivity across iframes and sandboxed environments
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
+export const db = getFirestore(app);
 
 export const auth = getAuth(app);
 
