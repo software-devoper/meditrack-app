@@ -51,20 +51,22 @@ export function ProductAutocomplete({
 
   const filtered = products
     .filter((p: any) => {
-      const s = search.toLowerCase();
+      const s = (search || '').toLowerCase();
       if (!s) return true;
-      return p.name.toLowerCase().includes(s) || (p.genericName && p.genericName.toLowerCase().includes(s));
+      return (p?.name || '').toLowerCase().includes(s) || (p?.genericName && p.genericName.toLowerCase().includes(s));
     })
     .sort((a: any, b: any) => {
-      const s = search.toLowerCase();
+      const s = (search || '').toLowerCase();
       if (!s) return 0;
+      const aName = a?.name || '';
+      const bName = b?.name || '';
       // Closest match logic: exact start gets highest priority
-      const aStarts = a.name.toLowerCase().startsWith(s) ? 1 : 0;
-      const bStarts = b.name.toLowerCase().startsWith(s) ? 1 : 0;
+      const aStarts = aName.toLowerCase().startsWith(s) ? 1 : 0;
+      const bStarts = bName.toLowerCase().startsWith(s) ? 1 : 0;
       if (aStarts !== bStarts) return bStarts - aStarts;
       
       // Then shortest string (closest to exact match)
-      return a.name.length - b.name.length;
+      return aName.length - bName.length;
     });
 
   const handleOpen = () => {

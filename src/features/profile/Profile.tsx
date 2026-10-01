@@ -70,9 +70,9 @@ export function Profile() {
     setIsUpdatingProfile(true);
     try {
       // Check username uniqueness if changed
-      if (data.username.toLowerCase() !== user.username.toLowerCase()) {
+      if ((data.username || '').toLowerCase() !== (user?.username || '').toLowerCase()) {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("username", "==", data.username.toLowerCase()));
+        const q = query(usersRef, where("username", "==", (data.username || '').toLowerCase()));
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
           throw new Error("Username is already taken by another user");
@@ -201,10 +201,20 @@ export function Profile() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Role</label>
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-md border text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">
-                  <ShieldCheck className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-                  {user.role}
+                <label className="text-sm font-medium">Workspace & Role</label>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{user.organizationName || 'MediTrack Cloud Pharmacy'}</span>
+                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300">
+                      {user.plan || 'growth'} Plan
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <ShieldCheck className="w-3.5 h-3.5 text-primary-600" />
+                    <span className="capitalize font-semibold text-slate-700 dark:text-slate-300">{user.role}</span>
+                    <span>•</span>
+                    <span className="font-mono text-[11px]">ID: {user.tenantId || 'tenant_apex'}</span>
+                  </div>
                 </div>
               </div>
 

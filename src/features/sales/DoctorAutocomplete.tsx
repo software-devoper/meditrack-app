@@ -49,17 +49,17 @@ export function DoctorAutocomplete({
   const mergedList: Array<{ item: Doctor | PatientDoctor; isPatientDoctor: boolean }> = [
     ...patientDoctors.map(pd => ({ item: pd, isPatientDoctor: true })),
     ...doctors
-      .filter(d => !patientDoctors.some(pd => pd.name.toLowerCase() === d.name.toLowerCase()))
+      .filter(d => !patientDoctors.some(pd => (pd?.name || '').toLowerCase() === (d?.name || '').toLowerCase()))
       .map(d => ({ item: d, isPatientDoctor: false }))
   ];
 
   const filtered = mergedList.filter(({ item }) => {
-    const s = search.toLowerCase();
+    const s = (search || '').toLowerCase();
     if (!s) return true;
     return (
-      item.name.toLowerCase().includes(s) ||
-      (item.phone && item.phone.includes(s)) ||
-      (item.address && item.address.toLowerCase().includes(s))
+      (item?.name || '').toLowerCase().includes(s) ||
+      (item?.phone && item.phone.includes(s)) ||
+      (item?.address && (item.address || '').toLowerCase().includes(s))
     );
   });
 
@@ -129,11 +129,11 @@ export function DoctorAutocomplete({
         placeholder={placeholder}
         className={className || "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700 h-9 text-sm"}
       />
-      {isOpen && (filtered.length > 0 || (search.trim().length > 0 && search.toLowerCase() !== 'n/a')) && (
+      {isOpen && (filtered.length > 0 || ((search || '').trim().length > 0 && (search || '').toLowerCase() !== 'n/a')) && (
         <ul className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y dark:divide-slate-700">
           {filtered.map(({ item: d, isPatientDoctor }, i) => (
             <li
-              key={d.id || `${d.name}-${i}`}
+              key={d.id || `${d?.name || 'doc'}-${i}`}
               className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
                 i === highlightedIdx 
                   ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' 

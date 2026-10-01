@@ -1,4 +1,24 @@
-export type Role = "admin" | "staff";
+export type Role = "owner" | "admin" | "pharmacist" | "staff";
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  plan: 'starter' | 'growth' | 'enterprise';
+  ownerId: string;
+  ownerName?: string;
+  createdAt: number;
+  status: 'active' | 'trial' | 'suspended';
+  trialEndsAt?: number;
+  branchesCount?: number;
+  gstNumber?: string;
+  panNumber?: string;
+  drugLicenseNumber?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  currency?: string;
+}
 
 export interface User {
   id?: string;
@@ -10,6 +30,18 @@ export interface User {
   isActive: boolean;
   createdAt: number;
   createdBy: string;
+  // SaaS Multi-Client Attributes
+  tenantId?: string;
+  organizationName?: string;
+  organizationSlug?: string;
+  plan?: 'starter' | 'growth' | 'enterprise';
+  phone?: string;
+  avatarUrl?: string;
+  emailVerified?: boolean;
+  authProvider?: 'google' | 'facebook' | 'email';
+  nationality?: string;
+  countryCode?: string;
+  registrationCompleted?: boolean;
 }
 
 export interface Product {

@@ -3,8 +3,28 @@ import { format } from 'date-fns';
 import { numberToWords } from '../../lib/currencyWords';
 import { phonepeQrBase64 } from '../../assets/phonepeQrData';
 import phonepeQrImg from '../../assets/phonepe-qr.png';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export function InvoicePrintTemplate({ sale }: { sale: any }) {
+  const { organization, user } = useAuthStore.getState();
+  const pharmacyName = organization?.name || user?.organizationName || 'HEALTHBUDDY CHAULKHOLA PHARMACY';
+  const proprietorName = organization?.ownerName || user?.name || 'SK SABBIR AHAMMED';
+  const pharmacyEmail = organization?.email || user?.contactEmail || 'hbchaulkholapharmacy@gmail.com';
+  const pharmacyPhone = organization?.phone || user?.phone || '8420023578';
+  const pharmacyGst = organization?.gstNumber || '19DRSPS0161Q1ZR';
+  const pharmacyPan = organization?.panNumber || (pharmacyGst.length >= 12 ? pharmacyGst.slice(2, 12) : 'DRSPS0161Q');
+
+  const rawDocName = typeof sale?.doctorName === 'string' ? sale.doctorName.trim() : '';
+  const isDoctorSkipped = !rawDocName || rawDocName.toUpperCase() === 'N/A' || rawDocName.toLowerCase() === 'self';
+  const displayDocName = isDoctorSkipped ? 'N/A' : rawDocName;
+  const displayDocPhone = isDoctorSkipped ? 'N/A' : (typeof sale?.doctorPhone === 'string' ? sale.doctorPhone.trim() : 'N/A');
+  const displayDocAddress = isDoctorSkipped ? 'N/A' : (typeof sale?.doctorAddress === 'string' ? sale.doctorAddress.trim() : 'N/A');
+
+  const rawPatientAddress = typeof (sale?.patientAddress || sale?.customerAddress) === 'string' 
+    ? (sale?.patientAddress || sale?.customerAddress).trim() 
+    : '';
+  const displayPatientAddress = (rawPatientAddress && rawPatientAddress.toLowerCase() !== 'local') ? rawPatientAddress : 'N/A';
+
   const items = sale?.items || [];
   const totalQty = items.reduce((acc: number, item: any) => acc + Number(item.qty || 0), 0);
   const totalMrp = items.reduce((acc: number, item: any) => acc + (Number(item.qty || 0) * Number(item.rate || 0)), 0);
@@ -160,7 +180,7 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
             <strong style={{ width: '70px', flexShrink: 0, fontWeight: 'bold' }}>Address</strong>
             <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {(sale?.patientAddress || sale?.customerAddress) && (sale?.patientAddress || sale?.customerAddress).trim().toLowerCase() !== 'local' ? (sale?.patientAddress || sale?.customerAddress) : 'N/A'}
+              {displayPatientAddress}
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'row', marginBottom: '1px' }}>
@@ -172,21 +192,21 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
             <strong style={{ width: '70px', flexShrink: 0, fontWeight: 'bold' }}>DR. Name</strong>
             <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {(!sale?.doctorName || sale.doctorName.trim() === '' || sale.doctorName.trim().toUpperCase() === 'N/A' || sale.doctorName.trim().toLowerCase() === 'self') ? 'N/A' : sale.doctorName}
+              {displayDocName}
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'row', marginBottom: '1px' }}>
             <strong style={{ width: '70px', flexShrink: 0, fontWeight: 'bold' }}>DR. Phone</strong>
             <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
             <span>
-              {(!sale?.doctorName || sale.doctorName.trim() === '' || sale.doctorName.trim().toUpperCase() === 'N/A' || sale.doctorName.trim().toLowerCase() === 'self') ? 'N/A' : (sale?.doctorPhone?.trim() || 'N/A')}
+              {displayDocPhone}
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'row' }}>
             <strong style={{ width: '70px', flexShrink: 0, fontWeight: 'bold' }}>DR. Address</strong>
             <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {(!sale?.doctorName || sale.doctorName.trim() === '' || sale.doctorName.trim().toUpperCase() === 'N/A' || sale.doctorName.trim().toLowerCase() === 'self') ? 'N/A' : (sale?.doctorAddress?.trim() || 'N/A')}
+              {displayDocAddress}
             </span>
           </div>
         </div>
@@ -208,35 +228,35 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           }}
         >
           <div style={{ fontSize: '10.7px', fontWeight: 'bold', textAlign: 'center', letterSpacing: '-0.2px', lineHeight: 1.1, marginBottom: '2px', textTransform: 'uppercase', color: '#000000' }}>
-            HEALTHBUDDY CHAULKHOLA PHARMACY
+            {pharmacyName}
           </div>
           <div style={{ borderTop: '1px solid rgba(0,0,0,0.3)', paddingTop: '1px' }}>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
               <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>PROPRIETER NAME</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
-              <span style={{ fontWeight: 600, color: '#000000' }}>SK SABBIR AHAMMED</span>
+              <span style={{ fontWeight: 600, color: '#000000' }}>{proprietorName}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
               <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>EMAIL</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
               <span style={{ fontWeight: 500, fontSize: '7.9px', color: '#000000', whiteSpace: 'nowrap' }}>
-                hbchaulkholapharmacy@gmail.com
+                {pharmacyEmail}
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
               <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>Mobile Number</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
-              <span style={{ fontWeight: 500, color: '#000000' }}>8420023578</span>
+              <span style={{ fontWeight: 500, color: '#000000' }}>{pharmacyPhone}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
               <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>PAN Number</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
-              <span style={{ fontWeight: 500, color: '#000000' }}>DRSPS0161Q</span>
+              <span style={{ fontWeight: 500, color: '#000000' }}>{pharmacyPan}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0' }}>
               <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>GST Number</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
-              <span style={{ fontWeight: 500, color: '#000000' }}>19DRSPS0161Q1ZR</span>
+              <span style={{ fontWeight: 500, color: '#000000' }}>{pharmacyGst}</span>
             </div>
           </div>
         </div>
@@ -316,8 +336,8 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
             {sale?.billTo?.trim() || sale?.patientName || sale?.customerName || 'Walk-in Patient'}
           </div>
           <div style={{ fontSize: '8.1px', lineHeight: 1.15 }}>Mobile: {sale?.patientPhone || sale?.customerPhone || 'N/A'}</div>
-          {(sale?.patientAddress || sale?.customerAddress) && (sale?.patientAddress || sale?.customerAddress).trim().toLowerCase() !== 'local' && (sale?.patientAddress || sale?.customerAddress).trim() !== 'N/A' && (
-            <div style={{ fontSize: '8.1px', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Address: {sale?.patientAddress || sale?.customerAddress}</div>
+          {displayPatientAddress !== 'N/A' && (
+            <div style={{ fontSize: '8.1px', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Address: {displayPatientAddress}</div>
           )}
         </div>
 

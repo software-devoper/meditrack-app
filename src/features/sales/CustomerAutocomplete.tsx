@@ -45,7 +45,10 @@ export function PatientAutocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = patientList.filter((c: any) => c.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = patientList.filter((c: any) => 
+    (c?.name || '').toLowerCase().includes((search || '').toLowerCase()) ||
+    (c?.phone && c.phone.includes(search || ''))
+  );
 
   const focusNextField = () => {
     const billToEl = document.getElementById('bill-to-input') as HTMLInputElement | null;

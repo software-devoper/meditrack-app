@@ -6,7 +6,7 @@ import { Suppliers } from './features/suppliers/Suppliers';
 import { Doctors } from './features/doctors/Doctors';
 import { Sales } from './features/sales/Sales';
 import { Purchase } from './features/purchase/Purchase';
-import { Login } from './features/auth/Login';
+import { AuthPage } from './features/auth/AuthPage';
 import { Bootstrap } from './features/auth/Bootstrap';
 import { Profile } from './features/profile/Profile';
 import { Settings } from './features/settings/Settings';
@@ -123,7 +123,9 @@ export default function App() {
       <UpdateNotificationCard />
       <Routes>
         <Route path="/setup" element={<Bootstrap />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<AuthPage />} />
+        <Route path="/signup" element={<AuthPage />} />
+        <Route path="/auth" element={<AuthPage />} />
         
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />

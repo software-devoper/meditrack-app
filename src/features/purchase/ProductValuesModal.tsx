@@ -25,7 +25,7 @@ export function ProductValuesModal({
 
   // Find all products matching this name (case-insensitive)
   const matchingProducts = allProducts.filter(
-    p => p.name.trim().toLowerCase() === productName.trim().toLowerCase()
+    p => (p?.name || '').trim().toLowerCase() === (productName || '').trim().toLowerCase()
   );
 
   // Sort by latest created/updated first

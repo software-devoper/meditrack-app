@@ -98,15 +98,15 @@ export function Suppliers() {
   };
 
   const filteredSuppliers = useMemo(() => {
-    const term = search.toLowerCase().trim();
+    const term = (search || '').toLowerCase().trim();
     if (!term) return suppliers;
     return suppliers.filter(s => 
-      s.name.toLowerCase().includes(term) || 
-      (s.phone && s.phone.includes(term)) ||
-      (s.email && s.email.toLowerCase().includes(term)) ||
-      (s.gstNumber && s.gstNumber.toLowerCase().includes(term)) ||
-      (s.drugLicenseNo && s.drugLicenseNo.toLowerCase().includes(term)) ||
-      (s.address && s.address.toLowerCase().includes(term))
+      (s?.name || '').toLowerCase().includes(term) || 
+      (s?.phone && s.phone.includes(term)) ||
+      (s?.email && s.email.toLowerCase().includes(term)) ||
+      (s?.gstNumber && s.gstNumber.toLowerCase().includes(term)) ||
+      (s?.drugLicenseNo && s.drugLicenseNo.toLowerCase().includes(term)) ||
+      (s?.address && s.address.toLowerCase().includes(term))
     );
   }, [suppliers, search]);
 

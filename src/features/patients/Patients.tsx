@@ -173,15 +173,19 @@ export function Patients() {
   const totalPrescribingDoctorsCount = allDistinctPrescribingDoctors.length;
 
   const filteredPatients = useMemo(() => {
-    const term = search.toLowerCase().trim();
+    const term = (search || '').toLowerCase().trim();
     if (!term) return patients;
-    return patients.filter(c => 
-      c.name.toLowerCase().includes(term) || 
-      (c.phone && c.phone.includes(term)) ||
-      (c.email && c.email.toLowerCase().includes(term)) ||
-      (c.address && c.address.toLowerCase().includes(term)) ||
-      (c.doctors && c.doctors.some(d => d.name.toLowerCase().includes(term)))
-    );
+    return patients.filter(c => {
+      const cName = (c?.name || '').toLowerCase();
+      const cPhone = c?.phone || '';
+      const cEmail = (c?.email || '').toLowerCase();
+      const cAddr = (c?.address || '').toLowerCase();
+      const docMatch = Array.isArray(c?.doctors) && c.doctors.some((d: any) => {
+        const dName = typeof d === 'string' ? d : d?.name || '';
+        return dName.toLowerCase().includes(term);
+      });
+      return cName.includes(term) || cPhone.includes(term) || cEmail.includes(term) || cAddr.includes(term) || docMatch;
+    });
   }, [patients, search]);
 
   // Turnover & Sales Analytics helper for any patient
@@ -234,7 +238,10 @@ export function Patients() {
   const historicalDoctors = useMemo(() => {
     if (!selectedStats || !selectedPatient) return [];
     const assignedNames = new Set(
-      (selectedPatient.doctors || []).map(d => d.name.toLowerCase().trim())
+      (selectedPatient.doctors || []).map((d: any) => {
+        const dName = typeof d === 'string' ? d : d?.name || '';
+        return dName.toLowerCase().trim();
+      })
     );
 
     const docMap = new Map<string, { name: string; phone: string; address: string; lastInvoice: string; lastDate: number }>();
@@ -948,38 +955,43 @@ export function Patients() {
                     {/* Assigned Doctors Cards */}
                     {selectedPatient.doctors && selectedPatient.doctors.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {selectedPatient.doctors.map((doc, idx) => (
-                          <div
-                            key={doc.id || idx}
-                            className="p-3.5 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/30 dark:bg-slate-800/90 flex items-start justify-between gap-3 shadow-2xs min-w-0"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
-                                <span className="truncate">Dr. {doc.name.replace(/^Dr\.?\s*/i, '')}</span>
-                              </p>
-                              {doc.phone && (
-                                <p className="text-xs text-slate-600 dark:text-slate-300 font-mono mt-1 flex items-center gap-1 truncate">
-                                  <Phone className="w-3 h-3 text-teal-600 shrink-0" />
-                                  <span className="truncate">{doc.phone}</span>
-                                </p>
-                              )}
-                              {doc.address && (
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-1 flex items-center gap-1">
-                                  <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                                  <span className="truncate">{doc.address}</span>
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveDoctorFromSelected(idx)}
-                              title="Remove doctor"
-                              className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors shrink-0"
+                        {selectedPatient.doctors.map((docItem: any, idx) => {
+                          const docName = typeof docItem === 'string' ? docItem : docItem?.name || 'Doctor';
+                          const docPhone = typeof docItem === 'object' ? docItem?.phone : '';
+                          const docAddress = typeof docItem === 'object' ? docItem?.address : '';
+                          return (
+                            <div
+                              key={docItem.id || idx}
+                              className="p-3.5 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/30 dark:bg-slate-800/90 flex items-start justify-between gap-3 shadow-2xs min-w-0"
                             >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
+                                  <span className="truncate">Dr. {docName.replace(/^Dr\.?\s*/i, '')}</span>
+                                </p>
+                                {docPhone && (
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 font-mono mt-1 flex items-center gap-1 truncate">
+                                    <Phone className="w-3 h-3 text-teal-600 shrink-0" />
+                                    <span className="truncate">{docPhone}</span>
+                                  </p>
+                                )}
+                                {docAddress && (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-1 flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span className="truncate">{docAddress}</span>
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleRemoveDoctorFromSelected(idx)}
+                                title="Remove doctor"
+                                className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors shrink-0"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900">

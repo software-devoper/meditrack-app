@@ -38,12 +38,15 @@ export function Doctors() {
     return () => unsub();
   }, []);
 
-  const filteredDoctors = doctors.filter(docItem => 
-    docItem.name.toLowerCase().includes(search.toLowerCase()) || 
-    docItem.phone.includes(search) ||
-    (docItem.email && docItem.email.toLowerCase().includes(search.toLowerCase())) ||
-    docItem.address.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredDoctors = doctors.filter(docItem => {
+    const s = (search || '').toLowerCase();
+    return (
+      (docItem?.name || '').toLowerCase().includes(s) || 
+      (docItem?.phone && docItem.phone.includes(search)) ||
+      (docItem?.email && docItem.email.toLowerCase().includes(s)) ||
+      (docItem?.address && docItem.address.toLowerCase().includes(s))
+    );
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

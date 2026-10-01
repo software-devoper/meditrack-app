@@ -38,9 +38,9 @@ export function SupplierSuggestionInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const query = value.trim().toLowerCase();
+  const query = (value || '').trim().toLowerCase();
   const matching = suppliers.filter(s => 
-    s.name.toLowerCase().includes(query) || (s.phone && s.phone.includes(query))
+    (s?.name || '').toLowerCase().includes(query) || (s?.phone && s.phone.includes(query))
   );
 
   const displayList = matching.slice(0, 6);

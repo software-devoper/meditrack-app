@@ -8,6 +8,8 @@ import { ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis
 import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useSettingsStore } from "../../store/useSettingsStore";
+import { useAuthStore } from "../../store/useAuthStore";
+import { Store, Building2 } from "lucide-react";
 
 const CHART_COLORS: Record<string, string[]> = {
   blue: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
@@ -68,6 +70,7 @@ const CustomPieTooltip = ({ active, payload }: any) => {
 
 export function Dashboard() {
   const { colorScheme } = useSettingsStore();
+  const { user, organization } = useAuthStore();
   const COLORS = CHART_COLORS[colorScheme] || CHART_COLORS.blue;
   const primaryColor = COLORS[0];
 
@@ -367,6 +370,38 @@ export function Dashboard() {
         </div>
       </div>
 
+      {/* Client Pharmacy Workspace Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-primary-50 via-teal-50/50 to-white dark:from-primary-950/40 dark:via-slate-850 dark:to-slate-900 border border-primary-100 dark:border-primary-900/40 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+            <Store className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                {organization?.name || user?.organizationName || 'MediTrack Cloud Pharmacy'}
+              </span>
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
+                {organization?.plan || user?.plan || 'Growth'} Plan
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Isolated workspace • {allProducts.length} medicines in inventory • {allSales.length} recorded sales transactions
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            to="/settings?tab=workspace"
+            className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1.5"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Workspace Profile & Staff</span>
+          </Link>
+        </div>
+      </div>
+
       {/* Period-Wise Filter Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold text-sm">
@@ -547,7 +582,7 @@ export function Dashboard() {
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 gap-4">
           <div>
             <CardTitle className="text-base font-bold">Activity in Selected Period</CardTitle>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Sales and purchase activity filtered by {periodRange.label.toLowerCase()}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Sales and purchase activity filtered by {(periodRange?.label || 'selected').toLowerCase()}</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-0.5 border border-slate-200 dark:border-slate-800">
@@ -620,7 +655,7 @@ export function Dashboard() {
                 {periodActivity.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-slate-500 dark:text-slate-400">
-                      No {activityType !== 'All' ? activityType.toLowerCase() : ''} activity recorded for {periodRange.label.toLowerCase()} period.
+                      No {activityType !== 'All' ? activityType.toLowerCase() : ''} activity recorded for {(periodRange?.label || 'selected').toLowerCase()} period.
                     </td>
                   </tr>
                 )}

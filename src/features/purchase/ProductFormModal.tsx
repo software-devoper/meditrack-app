@@ -212,7 +212,7 @@ export function ProductFormModal({
   // In edit mode, auto-fetch supplier phone if supplier exists
   useEffect(() => {
     if (isEdit && editSupplierName.trim() && !editSupplierPhone) {
-      const matched = suppliers.find(s => s.name.trim().toLowerCase() === editSupplierName.trim().toLowerCase());
+      const matched = suppliers.find(s => (s?.name || '').trim().toLowerCase() === editSupplierName.trim().toLowerCase());
       if (matched && matched.phone) {
         setEditSupplierPhone(matched.phone);
       }
@@ -241,7 +241,7 @@ export function ProductFormModal({
     saveSupplierDiscount(name, discountToSave);
 
     const existing = suppliers.find(
-      s => s.name.trim().toLowerCase() === name.toLowerCase()
+      s => (s?.name || '').trim().toLowerCase() === name.toLowerCase()
     );
 
     if (existing) {
@@ -326,9 +326,9 @@ export function ProductFormModal({
       const nameTrimmed = commonSupplier.trim().toLowerCase();
       // Update in-memory suppliers state so any dropdown and check gets latest discount immediately
       setSuppliers(prev => prev.map(s => 
-        s.name.trim().toLowerCase() === nameTrimmed ? { ...s, defaultDiscount: clamped } : s
+        (s?.name || '').trim().toLowerCase() === nameTrimmed ? { ...s, defaultDiscount: clamped } : s
       ));
-      const matched = suppliers.find(s => s.name.trim().toLowerCase() === nameTrimmed);
+      const matched = suppliers.find(s => (s?.name || '').trim().toLowerCase() === nameTrimmed);
       if (matched && matched.id && db) {
         setDoc(doc(db, 'customers', matched.id), { defaultDiscount: clamped }, { merge: true }).catch(() => {});
       }
@@ -349,8 +349,8 @@ export function ProductFormModal({
 
   const handleCommonSupplierChange = (val: string) => {
     setCommonSupplier(val);
-    const nameTrimmed = val.trim().toLowerCase();
-    const matched = suppliers.find(s => s.name.trim().toLowerCase() === nameTrimmed);
+    const nameTrimmed = (val || '').trim().toLowerCase();
+    const matched = suppliers.find(s => (s?.name || '').trim().toLowerCase() === nameTrimmed);
     const phone = matched?.phone || '';
     if (matched && phone) {
       setCommonSupplierPhone(phone);
@@ -400,7 +400,7 @@ export function ProductFormModal({
   };
 
   const handleRowSupplierChange = (index: number, val: string) => {
-    const matched = suppliers.find(s => s.name.trim().toLowerCase() === val.trim().toLowerCase());
+    const matched = suppliers.find(s => (s?.name || '').trim().toLowerCase() === (val || '').trim().toLowerCase());
     const phone = matched?.phone || '';
     const updated = [...rows];
     updated[index] = {
@@ -480,7 +480,7 @@ export function ProductFormModal({
     const sName = updated[index].supplierName || selectedProduct.supplierName || commonSupplier || '';
     let sPhone = updated[index].supplierPhone || '';
     if (sName && !sPhone) {
-      const matchSup = suppliers.find(s => s.name.trim().toLowerCase() === sName.trim().toLowerCase());
+      const matchSup = suppliers.find(s => (s?.name || '').trim().toLowerCase() === (sName || '').trim().toLowerCase());
       if (matchSup && matchSup.phone) {
         sPhone = matchSup.phone;
       }
@@ -847,7 +847,7 @@ export function ProductFormModal({
         }
 
         for (const [sName, sPhone] of suppliersMap.entries()) {
-          const supDisc = sName.trim().toLowerCase() === commonSupplier.trim().toLowerCase()
+          const supDisc = (sName || '').trim().toLowerCase() === (commonSupplier || '').trim().toLowerCase()
             ? defaultDiscount
             : getSupplierDiscount(sName, suppliers).discount;
           await autoSaveSupplier(sName, sPhone, supDisc, true);
@@ -1046,7 +1046,7 @@ export function ProductFormModal({
                     value={editSupplierName}
                     onChange={val => {
                       setEditSupplierName(val);
-                      const matched = suppliers.find(s => s.name.trim().toLowerCase() === val.trim().toLowerCase());
+                      const matched = suppliers.find(s => (s?.name || '').trim().toLowerCase() === (val || '').trim().toLowerCase());
                       if (matched && matched.phone) setEditSupplierPhone(matched.phone);
                     }}
                     onSelectSupplier={sup => {

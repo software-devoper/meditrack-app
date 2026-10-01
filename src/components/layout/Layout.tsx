@@ -13,7 +13,8 @@ import {
   X, 
   PanelLeftClose, 
   PanelLeftOpen,
-  PanelLeft
+  PanelLeft,
+  Building2
 } from "lucide-react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -23,6 +24,7 @@ import { signOut } from "firebase/auth";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui";
 import { Logo } from "../Logo";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { useState, useEffect } from "react";
 import { useAlertModal } from "../../context/AlertModalContext";
 
@@ -119,6 +121,11 @@ export function Layout() {
           >
             <X className="w-5 h-5" />
           </Button>
+        </div>
+
+        {/* Workspace Switcher in Mobile Drawer */}
+        <div className="px-3 pt-3 pb-2 border-b border-slate-100 dark:border-slate-700/60">
+          <WorkspaceSwitcher isCollapsed={false} />
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
@@ -218,6 +225,11 @@ export function Layout() {
           </Button>
         </div>
         
+        {/* Workspace Switcher in Desktop Sidebar */}
+        <div className="px-3 pt-3 pb-2 border-b border-slate-100 dark:border-slate-700/60">
+          <WorkspaceSwitcher isCollapsed={isCollapsed} />
+        </div>
+
         {/* Navigation Items */}
         <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => {
@@ -336,11 +348,26 @@ export function Layout() {
               <PanelLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
             </Button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
               <Logo className="w-6 h-6 md:hidden shrink-0" />
-              <span className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200 truncate">
-                {navItems.find((item) => item.path === location.pathname)?.label || 'MediTrack Pro'}
-              </span>
+              <div className="min-w-0 flex items-center gap-2">
+                <span className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200 truncate">
+                  {navItems.find((item) => item.path === location.pathname)?.label || 'MediTrack Cloud'}
+                </span>
+                {user?.organizationName && (
+                  <>
+                    <span aria-hidden="true" className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
+                    <Link
+                      to="/settings?tab=workspace"
+                      className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 font-medium truncate transition-colors"
+                      title="Manage Workspace & Organization"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-primary-500 shrink-0" />
+                      <span className="truncate max-w-[180px]">{user.organizationName}</span>
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

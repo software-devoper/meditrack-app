@@ -244,7 +244,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
       return;
     }
 
-    const existing = salesCustomers.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+    const existing = salesCustomers.find(c => (c?.name || '').toLowerCase() === trimmed.toLowerCase());
     if (existing) {
       applyPatientInfo(existing);
     } else {
@@ -810,7 +810,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
     setIsProcessing(true);
     try {
       const resolvedCustomerAddress = customerAddress.trim() || 
-        salesCustomers.find(c => (customerPhone && c.phone === customerPhone) || (customerName && c.name.toLowerCase() === customerName.toLowerCase()))?.address || 
+        salesCustomers.find(c => (customerPhone && c.phone === customerPhone) || (customerName && (c?.name || '').toLowerCase() === customerName.toLowerCase()))?.address || 
         '';
 
       const isDoctorSkipped = !doctorName || 
@@ -896,7 +896,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
           customerName.toLowerCase() !== 'walk in'
         ) {
           const matchedCust = salesCustomers.find(
-            c => c.name.toLowerCase() === customerName.toLowerCase() || (customerPhone && c.phone === customerPhone)
+            c => (c?.name || '').toLowerCase() === customerName.toLowerCase() || (customerPhone && c.phone === customerPhone)
           );
 
           const hasValidDoctor = doctorName && 
@@ -935,7 +935,10 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
             }
             if (docEntry) {
               const currentDocs = matchedCust.doctors || [];
-              const alreadyExists = currentDocs.some(d => d.name.toLowerCase() === docEntry.name.toLowerCase());
+              const alreadyExists = currentDocs.some((d: any) => {
+                const docName = typeof d === 'string' ? d : d?.name || '';
+                return docName.toLowerCase() === (docEntry.name || '').toLowerCase();
+              });
               if (!alreadyExists) {
                 updates.doctors = [...currentDocs, docEntry];
               }
@@ -1182,7 +1185,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
                   setDoctorAddress('');
                   return;
                 }
-                const matched = doctors.find(d => d.name.toLowerCase() === trimmed);
+                const matched = doctors.find(d => (d?.name || '').toLowerCase() === trimmed);
                 if (matched) {
                   setDoctorPhone(matched.phone || '');
                   setDoctorAddress(matched.address || '');
@@ -1202,7 +1205,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
 
                 if (!isWalkIn && trimmedName.length > 1) {
                   const isExisting = salesCustomers.some(c => 
-                    c.name.trim().toLowerCase() === trimmedName.toLowerCase() ||
+                    (c?.name || '').trim().toLowerCase() === trimmedName.toLowerCase() ||
                     (trimmedPhone.length > 0 && c.phone === trimmedPhone)
                   );
 

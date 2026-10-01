@@ -84,17 +84,20 @@ export function ProductsTab() {
 
   const multiValueProductNames = Array.from(new Set(
     products
-      .filter(p => products.filter(o => o.name.trim().toLowerCase() === p.name.trim().toLowerCase()).length > 1)
-      .map(p => p.name.trim().toLowerCase())
+      .filter(p => products.filter(o => (o?.name || '').trim().toLowerCase() === (p?.name || '').trim().toLowerCase()).length > 1)
+      .map(p => (p?.name || '').trim().toLowerCase())
   ));
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.genericName.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = (searchTerm || '').toLowerCase();
+    const pName = (p?.name || '').toLowerCase();
+    const pGeneric = (p?.genericName || '').toLowerCase();
+    const matchesSearch = pName.includes(s) || pGeneric.includes(s);
     if (!matchesSearch) return false;
     
     if (filterMultipleValuesOnly) {
-      const count = products.filter(o => o.name.trim().toLowerCase() === p.name.trim().toLowerCase()).length;
+      const pNameTrimmed = (p?.name || '').trim().toLowerCase();
+      const count = products.filter(o => (o?.name || '').trim().toLowerCase() === pNameTrimmed).length;
       if (count <= 1) return false;
     }
     return true;
@@ -158,7 +161,7 @@ export function ProductsTab() {
               <tbody className="divide-y">
                 {filteredProducts.map(product => {
                   const matchingCount = products.filter(
-                    p => p.name.trim().toLowerCase() === product.name.trim().toLowerCase()
+                    p => (p?.name || '').trim().toLowerCase() === (product?.name || '').trim().toLowerCase()
                   ).length;
                   const hasMultipleValues = matchingCount > 1;
 

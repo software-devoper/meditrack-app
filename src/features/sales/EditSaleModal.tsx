@@ -16,7 +16,7 @@ export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => voi
   const [isBillToCustomized, setIsBillToCustomized] = useState(Boolean(sale.billTo && sale.billTo !== (sale.patientName || sale.customerName)));
   const [customerPhone, setCustomerPhone] = useState(sale.patientPhone || sale.customerPhone || '');
   const [customerAddress, setCustomerAddress] = useState(
-    (sale.patientAddress || sale.customerAddress) && (sale.patientAddress || sale.customerAddress).trim().toLowerCase() !== 'local' 
+    ((sale?.patientAddress || sale?.customerAddress || '').trim().toLowerCase() !== 'local' && (sale?.patientAddress || sale?.customerAddress))
       ? (sale.patientAddress || sale.customerAddress) 
       : ''
   );
@@ -365,7 +365,7 @@ export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => voi
                     setDoctorAddress('');
                     return;
                   }
-                  const matched = customers.find(c => c.type === 'sale' && c.name.toLowerCase() === trimmed.toLowerCase());
+                  const matched = customers.find(c => c.type === 'sale' && (c?.name || '').toLowerCase() === trimmed.toLowerCase());
                   if (matched) {
                     applyPatientInfo(matched);
                   } else {
@@ -496,7 +496,7 @@ export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => voi
                     setDoctorAddress('');
                     return;
                   }
-                  const matched = doctors.find(d => d.name.toLowerCase() === trimmed);
+                  const matched = doctors.find(d => (d?.name || '').toLowerCase() === trimmed);
                   if (matched) {
                     setDoctorPhone(matched.phone || '');
                     setDoctorAddress(matched.address || '');

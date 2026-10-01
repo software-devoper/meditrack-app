@@ -42,12 +42,12 @@ export function ProductSuggestionInput({
   }, []);
 
   // Filter matching products
-  const query = value.trim().toLowerCase();
+  const query = (value || '').trim().toLowerCase();
   const matchingProducts = query.length > 0
     ? products.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        (p.genericName && p.genericName.toLowerCase().includes(query)) ||
-        (p.category && p.category.toLowerCase().includes(query))
+        (p?.name || '').toLowerCase().includes(query) || 
+        (p?.genericName && p.genericName.toLowerCase().includes(query)) ||
+        (p?.category && p.category.toLowerCase().includes(query))
       )
     : [];
 
@@ -149,7 +149,7 @@ export function ProductSuggestionInput({
               const isSelected = idx === highlightedIndex;
               // Check if there are other entries with the same name
               const duplicateCount = products.filter(
-                p => p.name.trim().toLowerCase() === prod.name.trim().toLowerCase()
+                p => (p?.name || '').trim().toLowerCase() === (prod?.name || '').trim().toLowerCase()
               ).length;
 
               return (
