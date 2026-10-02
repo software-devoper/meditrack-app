@@ -25,467 +25,44 @@ class MockDatabaseEmitter {
 const dbEmitter = new MockDatabaseEmitter();
 
 // Initialize LocalStorage with seed data if empty
-const SEED_DATA: Record<string, any[]> = {
-  organizations: [
-    {
-      id: 'tenant_apex',
-      name: 'Apex Health & Pharmacy Cloud',
-      slug: 'apex-rx',
-      plan: 'growth',
-      ownerId: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1',
-      createdAt: Date.now() - 30 * 24 * 3600 * 1000,
-      status: 'active',
-      branchesCount: 3,
-      gstNumber: '07AAAAA1111A1Z1',
-      address: 'Suite 400, Medical Plaza, Metro City',
-      phone: '+1 (555) 234-5678'
-    },
-    {
-      id: 'tenant_metro',
-      name: 'Metro Care Multi-Specialty Clinic',
-      slug: 'metro-care',
-      plan: 'enterprise',
-      ownerId: 'user_metro_pharmacist',
-      createdAt: Date.now() - 15 * 24 * 3600 * 1000,
-      status: 'active',
-      branchesCount: 5,
-      gstNumber: '27BBBBB2222B2Z2',
-      address: 'Central Crossroad, Tech District',
-      phone: '+1 (555) 987-6543'
+// Purge legacy demo data on load to guarantee pristine registration state
+(function purgeLegacyDemoData() {
+  try {
+    const PURGE_KEY = 'meditrack_clean_zero_demo_v5';
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(PURGE_KEY) !== 'true') {
+      const keysToClear = [
+        'meditrack_mock_organizations',
+        'meditrack_mock_users',
+        'meditrack_mock_products',
+        'meditrack_mock_customers',
+        'meditrack_mock_doctors',
+        'meditrack_mock_sales',
+        'meditrack_mock_purchases',
+        'meditrack_mock_purchase',
+        'meditrack_mock_stockLedger',
+        'meditrack_mock_metadata',
+        'meditrack_mock_auditLogs',
+        'meditrack_mock_passwords',
+        'meditrack-auth-storage',
+        'meditrack_has_logged_out'
+      ];
+      keysToClear.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(PURGE_KEY, 'true');
     }
-  ],
-  users: [
-    {
-      id: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1',
-      name: 'Dr. Sarah Mitchell',
-      username: 'admin',
-      role: 'owner',
-      isActive: true,
-      internalAuthEmail: 'admin@meditrack.local',
-      contactEmail: 'sarah.mitchell@apexrx.health',
-      tenantId: 'tenant_apex',
-      organizationName: 'Apex Health & Pharmacy Cloud',
-      organizationSlug: 'apex-rx',
-      plan: 'growth',
-      createdAt: Date.now() - 30 * 24 * 3600 * 1000,
-      createdBy: 'system'
-    },
-    {
-      id: 'user_metro_pharmacist',
-      name: 'Marcus Vance, PharmD',
-      username: 'marcus_rx',
-      role: 'pharmacist',
-      isActive: true,
-      internalAuthEmail: 'marcus@metrocare.local',
-      contactEmail: 'marcus.v@metrocare.org',
-      tenantId: 'tenant_metro',
-      organizationName: 'Metro Care Multi-Specialty Clinic',
-      organizationSlug: 'metro-care',
-      plan: 'enterprise',
-      createdAt: Date.now() - 15 * 24 * 3600 * 1000,
-      createdBy: 'system'
-    }
-  ],
-  products: [
-    // Apex Health & Pharmacy Cloud (tenant_apex)
-    {
-      id: 'p1',
-      tenantId: 'tenant_apex',
-      name: 'Paracetamol 650mg',
-      genericName: 'Acetaminophen',
-      category: 'Analgesics',
-      manufacturer: 'GSK Pharmaceuticals',
-      hsnCode: '30049011',
-      unit: 'Strip',
-      purchasePrice: 12.5,
-      mrp: 22.0,
-      gstPercent: 12,
-      stockQty: 120,
-      reorderLevel: 30,
-      rackLocation: 'A-12',
-      supplierName: 'MediLife Distributors',
-      createdAt: Date.now() - 15 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 15 * 24 * 3600 * 1000
-    },
-    {
-      id: 'p2',
-      tenantId: 'tenant_apex',
-      name: 'Amoxicillin 500mg',
-      genericName: 'Amoxicillin Trihydrate',
-      category: 'Antibiotics',
-      manufacturer: 'Alkem Laboratories',
-      hsnCode: '30041010',
-      unit: 'Strip',
-      purchasePrice: 45.0,
-      mrp: 78.5,
-      gstPercent: 12,
-      stockQty: 85,
-      reorderLevel: 20,
-      rackLocation: 'B-04',
-      supplierName: 'Astra Pharmaceuticals',
-      createdAt: Date.now() - 10 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 10 * 24 * 3600 * 1000
-    },
-    {
-      id: 'p3',
-      tenantId: 'tenant_apex',
-      name: 'Metformin 500mg',
-      genericName: 'Metformin Hydrochloride',
-      category: 'Antidiabetics',
-      manufacturer: 'Abbott Healthcare',
-      hsnCode: '30049085',
-      unit: 'Strip',
-      purchasePrice: 15.0,
-      mrp: 28.0,
-      gstPercent: 12,
-      stockQty: 250,
-      reorderLevel: 50,
-      rackLocation: 'C-08',
-      supplierName: 'MediLife Distributors',
-      createdAt: Date.now() - 25 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 25 * 24 * 3600 * 1000
-    },
-    {
-      id: 'p4',
-      tenantId: 'tenant_apex',
-      name: 'Azithromycin 500mg',
-      genericName: 'Azithromycin Dihydrate',
-      category: 'Antibiotics',
-      manufacturer: 'Pfizer Labs',
-      hsnCode: '30041020',
-      unit: 'Strip',
-      purchasePrice: 65.0,
-      mrp: 115.0,
-      gstPercent: 12,
-      stockQty: 45,
-      reorderLevel: 15,
-      rackLocation: 'B-09',
-      supplierName: 'Astra Pharmaceuticals',
-      createdAt: Date.now() - 8 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 8 * 24 * 3600 * 1000
-    },
-    {
-      id: 'p5',
-      tenantId: 'tenant_apex',
-      name: 'Omeprazole 20mg',
-      genericName: 'Omeprazole Magnesium',
-      category: 'Antacids',
-      manufacturer: 'Sun Pharma',
-      hsnCode: '30049030',
-      unit: 'Strip',
-      purchasePrice: 22.0,
-      mrp: 44.0,
-      gstPercent: 12,
-      stockQty: 140,
-      reorderLevel: 30,
-      rackLocation: 'D-02',
-      supplierName: 'MediLife Distributors',
-      createdAt: Date.now() - 14 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 14 * 24 * 3600 * 1000
-    },
+  } catch (_) {}
+})();
 
-    // Metro Care Multi-Specialty Clinic (tenant_metro)
-    {
-      id: 'pm1',
-      tenantId: 'tenant_metro',
-      name: 'Atorvastatin 20mg',
-      genericName: 'Atorvastatin Calcium',
-      category: 'Cardiovascular',
-      manufacturer: 'Cadila Pharma',
-      hsnCode: '30049070',
-      unit: 'Strip',
-      purchasePrice: 58.0,
-      mrp: 110.0,
-      gstPercent: 12,
-      stockQty: 90,
-      reorderLevel: 25,
-      rackLocation: 'M-01',
-      supplierName: 'Beacon Health Pharma',
-      createdAt: Date.now() - 12 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 12 * 24 * 3600 * 1000
-    },
-    {
-      id: 'pm2',
-      tenantId: 'tenant_metro',
-      name: 'Losartan Potassium 50mg',
-      genericName: 'Losartan Potassium',
-      category: 'Cardiovascular',
-      manufacturer: 'Cipla Health',
-      hsnCode: '30049072',
-      unit: 'Strip',
-      purchasePrice: 35.0,
-      mrp: 65.0,
-      gstPercent: 12,
-      stockQty: 150,
-      reorderLevel: 30,
-      rackLocation: 'M-02',
-      supplierName: 'SunRx Logistics',
-      createdAt: Date.now() - 11 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 11 * 24 * 3600 * 1000
-    },
-    {
-      id: 'pm3',
-      tenantId: 'tenant_metro',
-      name: 'Ibuprofen 400mg',
-      genericName: 'Ibuprofen',
-      category: 'Analgesics',
-      manufacturer: 'Abbott Healthcare',
-      hsnCode: '30049015',
-      unit: 'Strip',
-      purchasePrice: 18.0,
-      mrp: 35.0,
-      gstPercent: 12,
-      stockQty: 200,
-      reorderLevel: 40,
-      rackLocation: 'M-03',
-      supplierName: 'Beacon Health Pharma',
-      createdAt: Date.now() - 10 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 10 * 24 * 3600 * 1000
-    },
-    {
-      id: 'pm4',
-      tenantId: 'tenant_metro',
-      name: 'Pantoprazole 40mg',
-      genericName: 'Pantoprazole Sodium',
-      category: 'Antacids',
-      manufacturer: 'Alkem Laboratories',
-      hsnCode: '30049033',
-      unit: 'Strip',
-      purchasePrice: 42.0,
-      mrp: 85.0,
-      gstPercent: 12,
-      stockQty: 110,
-      reorderLevel: 25,
-      rackLocation: 'M-04',
-      supplierName: 'SunRx Logistics',
-      createdAt: Date.now() - 9 * 24 * 3600 * 1000,
-      updatedAt: Date.now() - 9 * 24 * 3600 * 1000
-    }
-  ],
-  customers: [
-    // Apex Health
-    {
-      id: 'c1',
-      tenantId: 'tenant_apex',
-      name: 'Rahul Sharma',
-      phone: '9876543210',
-      email: 'rahul@gmail.com',
-      address: '123, Park Street, Kolkata',
-      type: 'sale',
-      outstandingBalance: 0,
-      doctors: [{ id: 'doc_c1', name: 'Dr. Amit Sen', phone: '9830012345', address: 'Apollo Clinic, Kolkata' }],
-      createdAt: Date.now() - 5 * 24 * 3600 * 1000,
-      createdBy: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1'
-    },
-    {
-      id: 'c2',
-      tenantId: 'tenant_apex',
-      name: 'Priya Patel',
-      phone: '9823456781',
-      email: 'priya@gmail.com',
-      address: '45, Satellite Road, Ahmedabad',
-      type: 'sale',
-      outstandingBalance: 150,
-      doctors: [{ id: 'doc_c2', name: 'Dr. Meera Shah', phone: '9822334455', address: 'Sterling Hospital, Ahmedabad' }],
-      createdAt: Date.now() - 4 * 24 * 3600 * 1000,
-      createdBy: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1'
-    },
-    {
-      id: 's1',
-      tenantId: 'tenant_apex',
-      name: 'MediLife Distributors',
-      phone: '9111222333',
-      email: 'orders@medilife.com',
-      address: 'Industrial Area Phase 2, Delhi',
-      type: 'purchase',
-      outstandingBalance: 0,
-      gstNumber: '07AAAAA1111A1Z1',
-      createdAt: Date.now() - 20 * 24 * 3600 * 1000,
-      createdBy: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1'
-    },
-    // Metro Care
-    {
-      id: 'cm1',
-      tenantId: 'tenant_metro',
-      name: 'David Miller',
-      phone: '9811223344',
-      email: 'david.m@outlook.com',
-      address: '742 Evergreen Terrace, West Wing',
-      type: 'sale',
-      outstandingBalance: 0,
-      doctors: [{ id: 'doc_cm1', name: 'Dr. Rajesh Gupta', phone: '9811002200', address: 'City Heart Center' }],
-      createdAt: Date.now() - 6 * 24 * 3600 * 1000,
-      createdBy: 'user_metro_pharmacist'
-    },
-    {
-      id: 'cm2',
-      tenantId: 'tenant_metro',
-      name: 'Ananya Roy',
-      phone: '9877665544',
-      email: 'ananya.roy@yahoo.com',
-      address: 'Block C, Heritage Heights',
-      type: 'sale',
-      outstandingBalance: 80,
-      doctors: [{ id: 'doc_cm2', name: 'Dr. Elena Rostova', phone: '9877001122', address: 'Global Care Clinic' }],
-      createdAt: Date.now() - 3 * 24 * 3600 * 1000,
-      createdBy: 'user_metro_pharmacist'
-    },
-    {
-      id: 'sm1',
-      tenantId: 'tenant_metro',
-      name: 'Beacon Health Pharma',
-      phone: '9800112233',
-      email: 'orders@beaconhealth.com',
-      address: 'Pharma Port, Bay 4',
-      type: 'purchase',
-      outstandingBalance: 0,
-      gstNumber: '27BBBBB2222B2Z2',
-      createdAt: Date.now() - 18 * 24 * 3600 * 1000,
-      createdBy: 'user_metro_pharmacist'
-    }
-  ],
-  doctors: [
-    // Apex Health
-    {
-      id: 'd1',
-      tenantId: 'tenant_apex',
-      name: 'Dr. Amit Sen',
-      phone: '9830012345',
-      email: 'amit.sen@apollo.com',
-      address: 'Apollo Clinic, Kolkata',
-      createdAt: Date.now() - 12 * 24 * 3600 * 1000,
-      createdBy: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1'
-    },
-    {
-      id: 'd2',
-      tenantId: 'tenant_apex',
-      name: 'Dr. Meera Shah',
-      phone: '9824098765',
-      email: 'meera.shah@zydus.com',
-      address: 'Zydus Hospital, Ahmedabad',
-      createdAt: Date.now() - 8 * 24 * 3600 * 1000,
-      createdBy: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1'
-    },
-    // Metro Care
-    {
-      id: 'dm1',
-      tenantId: 'tenant_metro',
-      name: 'Dr. Rajesh Gupta',
-      phone: '9812345678',
-      email: 'rajesh.gupta@metrocare.org',
-      address: 'Metro Cardiology Pavilion',
-      createdAt: Date.now() - 10 * 24 * 3600 * 1000,
-      createdBy: 'user_metro_pharmacist'
-    },
-    {
-      id: 'dm2',
-      tenantId: 'tenant_metro',
-      name: 'Dr. Elena Rostova',
-      phone: '9898765432',
-      email: 'elena.rostova@metrocare.org',
-      address: 'Metro Internal Medicine Center',
-      createdAt: Date.now() - 7 * 24 * 3600 * 1000,
-      createdBy: 'user_metro_pharmacist'
-    }
-  ],
-  sales: [
-    // Apex Health Sales
-    {
-      id: 'sale_apex_1',
-      tenantId: 'tenant_apex',
-      invoiceNo: 'HCP-101',
-      billTo: 'Rahul Sharma',
-      patientName: 'Rahul Sharma',
-      patientPhone: '9876543210',
-      patientAddress: '123, Park Street, Kolkata',
-      doctorName: 'Dr. Amit Sen',
-      items: [
-        { productId: 'p1', name: 'Paracetamol 650mg', qty: 2, rate: 22.0, purchasePrice: 12.5, gstPercent: 12, discount: 0, unit: 'Strip' },
-        { productId: 'p2', name: 'Amoxicillin 500mg', qty: 1, rate: 78.5, purchasePrice: 45.0, gstPercent: 12, discount: 0, unit: 'Strip' }
-      ],
-      subtotal: 122.5,
-      discountTotal: 0,
-      gstTotal: 14.7,
-      grandTotal: 137.0,
-      paymentMode: 'UPI',
-      date: Date.now() - 2 * 24 * 3600 * 1000,
-      createdBy: 'admin',
-      status: 'completed'
-    },
-    {
-      id: 'sale_apex_2',
-      tenantId: 'tenant_apex',
-      invoiceNo: 'HCP-102',
-      billTo: 'Priya Patel',
-      patientName: 'Priya Patel',
-      patientPhone: '9823456781',
-      patientAddress: '45, Satellite Road, Ahmedabad',
-      doctorName: 'Dr. Meera Shah',
-      items: [
-        { productId: 'p3', name: 'Metformin 500mg', qty: 3, rate: 28.0, purchasePrice: 15.0, gstPercent: 12, discount: 5, unit: 'Strip' },
-        { productId: 'p5', name: 'Omeprazole 20mg', qty: 2, rate: 44.0, purchasePrice: 22.0, gstPercent: 12, discount: 0, unit: 'Strip' }
-      ],
-      subtotal: 172.0,
-      discountTotal: 4.2,
-      gstTotal: 20.1,
-      grandTotal: 188.0,
-      paymentMode: 'Cash',
-      date: Date.now() - 1 * 24 * 3600 * 1000,
-      createdBy: 'admin',
-      status: 'completed'
-    },
-    // Metro Care Sales
-    {
-      id: 'sale_metro_1',
-      tenantId: 'tenant_metro',
-      invoiceNo: 'HCP-1',
-      billTo: 'David Miller',
-      patientName: 'David Miller',
-      patientPhone: '9811223344',
-      patientAddress: '742 Evergreen Terrace, West Wing',
-      doctorName: 'Dr. Rajesh Gupta',
-      items: [
-        { productId: 'pm1', name: 'Atorvastatin 20mg', qty: 2, rate: 110.0, purchasePrice: 58.0, gstPercent: 12, discount: 10, unit: 'Strip' },
-        { productId: 'pm2', name: 'Losartan Potassium 50mg', qty: 2, rate: 65.0, purchasePrice: 35.0, gstPercent: 12, discount: 0, unit: 'Strip' }
-      ],
-      subtotal: 350.0,
-      discountTotal: 22.0,
-      gstTotal: 39.3,
-      grandTotal: 367.0,
-      paymentMode: 'Card',
-      date: Date.now() - 3 * 24 * 3600 * 1000,
-      createdBy: 'marcus_rx',
-      status: 'completed'
-    },
-    {
-      id: 'sale_metro_2',
-      tenantId: 'tenant_metro',
-      invoiceNo: 'HCP-2',
-      billTo: 'Ananya Roy',
-      patientName: 'Ananya Roy',
-      patientPhone: '9877665544',
-      patientAddress: 'Block C, Heritage Heights',
-      doctorName: 'Dr. Elena Rostova',
-      items: [
-        { productId: 'pm4', name: 'Pantoprazole 40mg', qty: 2, rate: 85.0, purchasePrice: 42.0, gstPercent: 12, discount: 0, unit: 'Strip' },
-        { productId: 'pm3', name: 'Ibuprofen 400mg', qty: 3, rate: 35.0, purchasePrice: 18.0, gstPercent: 12, discount: 5, unit: 'Strip' }
-      ],
-      subtotal: 275.0,
-      discountTotal: 5.2,
-      gstTotal: 32.3,
-      grandTotal: 302.0,
-      paymentMode: 'Cash',
-      date: Date.now() - 1 * 24 * 3600 * 1000,
-      createdBy: 'marcus_rx',
-      status: 'completed'
-    }
-  ],
+// Clean initial empty database state
+const SEED_DATA: Record<string, any[]> = {
+  organizations: [],
+  users: [],
+  products: [],
+  customers: [],
+  doctors: [],
+  sales: [],
   purchases: [],
   stockLedger: [],
-  metadata: [
-    { id: 'tenant_apex_salesCounter', tenantId: 'tenant_apex', current: 102 },
-    { id: 'tenant_metro_salesCounter', tenantId: 'tenant_metro', current: 2 }
-  ]
+  metadata: []
 };
 
 const TENANT_ISOLATED_COLLECTIONS = new Set([
@@ -511,7 +88,7 @@ export function getActiveTenantId(): string {
       if (parsed?.state?.user?.tenantId) return parsed.state.user.tenantId;
     }
   } catch (_) {}
-  return 'tenant_apex';
+  return '';
 }
 
 // Helper to get collection from localStorage
@@ -522,45 +99,13 @@ export function getCollectionData(collectionName: string): any[] {
     try {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        let changed = false;
-        // Migration: Ensure legacy items in isolated collections have tenantId
-        if (TENANT_ISOLATED_COLLECTIONS.has(collectionName)) {
-          parsed.forEach(item => {
-            if (!item.tenantId) {
-              item.tenantId = 'tenant_apex';
-              changed = true;
-            }
-          });
-        }
-        // Normalize customer doctors to objects
-        if (collectionName === 'customers') {
-          parsed.forEach(item => {
-            if (Array.isArray(item.doctors)) {
-              item.doctors = item.doctors.map((d: any) => 
-                typeof d === 'string' ? { id: 'doc_' + Math.random().toString(36).slice(2, 7), name: d } : d
-              );
-            }
-          });
-        }
-        // Merge missing seed items (e.g. for tenant_metro or new tenants)
-        const seedItems = SEED_DATA[collectionName] || [];
-        seedItems.forEach(seedItem => {
-          if (!parsed.some(p => p.id === seedItem.id)) {
-            parsed.push(seedItem);
-            changed = true;
-          }
-        });
-        if (changed) {
-          localStorage.setItem(key, JSON.stringify(parsed));
-        }
         return parsed;
       }
     } catch (_) {}
   }
-  // Initialize with seed data or empty
-  const seed = SEED_DATA[collectionName] || [];
-  localStorage.setItem(key, JSON.stringify(seed));
-  return seed;
+  const empty: any[] = [];
+  localStorage.setItem(key, JSON.stringify(empty));
+  return empty;
 }
 
 // Helper to save collection to localStorage
@@ -623,12 +168,12 @@ class MockAuth {
         if (parsed?.state?.user) {
           const user = parsed.state.user;
           this.currentMockUser = {
-            uid: user.id || 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1',
-            email: user.internalAuthEmail || user.contactEmail || 'admin@meditrack.local',
+            uid: user.id || '',
+            email: user.internalAuthEmail || user.contactEmail || '',
             emailVerified: true,
-            displayName: user.name || 'Dr. Sarah Mitchell',
-            tenantId: user.tenantId || 'tenant_apex',
-            organizationName: user.organizationName || 'Apex Health & Pharmacy Cloud'
+            displayName: user.name || 'Pharmacy Administrator',
+            tenantId: user.tenantId || '',
+            organizationName: user.organizationName || ''
           };
         }
       } catch (_) {}
@@ -686,22 +231,6 @@ class MockAuth {
         organizationName: matched.organizationName,
         role: matched.role
       };
-      this.authListeners.forEach(cb => cb(this.currentMockUser));
-      return { user: this.currentMockUser };
-    }
-
-    // Default system admin login fallback
-    if (input === 'admin' && pass === 'admin123') {
-      const adminUser = {
-        uid: 'ALsPrTLRjXfFHmcgUqdqZiJPqcm1',
-        email: 'admin@meditrack.local',
-        emailVerified: true,
-        displayName: 'Dr. Sarah Mitchell',
-        tenantId: 'tenant_apex',
-        organizationName: 'Apex Health & Pharmacy Cloud',
-        role: 'owner'
-      };
-      this.currentMockUser = adminUser;
       this.authListeners.forEach(cb => cb(this.currentMockUser));
       return { user: this.currentMockUser };
     }
@@ -848,69 +377,6 @@ export async function signUpSaaSUser(payload: {
   saveStoredPassword(normalizedUsername, payload.password);
   saveStoredPassword(normalizedEmail, payload.password);
 
-  // Seed starter inventory for the new client's pharmacy workspace
-  const products = getCollectionData('products');
-  products.push(
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Paracetamol 650mg Fast-Action',
-      genericName: 'Paracetamol / Acetaminophen',
-      category: 'Analgesics',
-      manufacturer: 'Apex Pharma Labs',
-      hsnCode: '30049011',
-      unit: 'Strip',
-      purchasePrice: 14.0,
-      mrp: 24.5,
-      gstPercent: 12,
-      stockQty: 100,
-      reorderLevel: 25,
-      rackLocation: 'A-01',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Amoxicillin 500mg Caps',
-      genericName: 'Amoxicillin Trihydrate',
-      category: 'Antibiotics',
-      manufacturer: 'Cipla Healthcare',
-      hsnCode: '30041010',
-      unit: 'Strip',
-      purchasePrice: 48.0,
-      mrp: 82.0,
-      gstPercent: 12,
-      stockQty: 60,
-      reorderLevel: 15,
-      rackLocation: 'B-02',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Cetirizine 10mg Tablet',
-      genericName: 'Cetirizine Hydrochloride',
-      category: 'Antihistamines',
-      manufacturer: 'Sun Pharmaceuticals',
-      hsnCode: '30049099',
-      unit: 'Strip',
-      purchasePrice: 8.5,
-      mrp: 18.0,
-      gstPercent: 12,
-      stockQty: 120,
-      reorderLevel: 20,
-      rackLocation: 'C-05',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    }
-  );
-  saveCollectionData('products', products);
-
   // Initialize their sales counter
   const metadata = getCollectionData('metadata');
   metadata.push({ id: `${tenantId}_salesCounter`, tenantId: tenantId, current: 0 });
@@ -963,11 +429,11 @@ export async function resetSaaSPassword(identifier: string, newPassword: string)
  * Enterprise SaaS Google OAuth Simulator:
  * One-click provision with Google for seamless onboarding.
  */
-export async function signInWithGoogleSaaS(organizationName = 'Apex MedCloud Pharmacy') {
+export async function signInWithGoogleSaaS(organizationName = 'My Pharmacy Workspace', userEmail = 'user@gmail.com', userName = 'Pharmacy Owner') {
   const users = getCollectionData('users');
   const orgs = getCollectionData('organizations');
 
-  const googleEmail = 'doctor.partner@gmail.com';
+  const googleEmail = userEmail.toLowerCase().trim();
   let matchedUser = users.find(u => u.contactEmail === googleEmail || u.internalAuthEmail === googleEmail);
   let matchedOrg: Organization | null = null;
 
@@ -1090,88 +556,6 @@ export async function createClientWorkspace(payload: {
 
   orgs.push(newOrg);
   saveCollectionData('organizations', orgs);
-
-  // Seed inventory for this new workspace
-  const products = getCollectionData('products');
-  products.push(
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Paracetamol 650mg Tablets',
-      genericName: 'Paracetamol / Acetaminophen',
-      category: 'Analgesics',
-      manufacturer: 'GSK Pharmaceuticals',
-      hsnCode: '30049011',
-      unit: 'Strip',
-      purchasePrice: 15.0,
-      mrp: 28.0,
-      gstPercent: 12,
-      stockQty: 80,
-      reorderLevel: 20,
-      rackLocation: 'A-01',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Amoxicillin 500mg Caps',
-      genericName: 'Amoxicillin Trihydrate',
-      category: 'Antibiotics',
-      manufacturer: 'Cipla Healthcare',
-      hsnCode: '30041010',
-      unit: 'Strip',
-      purchasePrice: 48.0,
-      mrp: 85.0,
-      gstPercent: 12,
-      stockQty: 50,
-      reorderLevel: 15,
-      rackLocation: 'B-02',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Azithromycin 500mg Tablets',
-      genericName: 'Azithromycin Dihydrate',
-      category: 'Antibiotics',
-      manufacturer: 'Sun Pharmaceuticals',
-      hsnCode: '30042010',
-      unit: 'Strip',
-      purchasePrice: 65.0,
-      mrp: 118.0,
-      gstPercent: 12,
-      stockQty: 40,
-      reorderLevel: 10,
-      rackLocation: 'B-03',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Pantoprazole 40mg Gastro-Resistant',
-      genericName: 'Pantoprazole Sodium',
-      category: 'Antacids',
-      manufacturer: 'Alkem Labs',
-      hsnCode: '30049033',
-      unit: 'Strip',
-      purchasePrice: 42.0,
-      mrp: 89.0,
-      gstPercent: 12,
-      stockQty: 90,
-      reorderLevel: 25,
-      rackLocation: 'C-01',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    }
-  );
-  saveCollectionData('products', products);
 
   // Initialize salesCounter for this tenant
   const metadata = getCollectionData('metadata');

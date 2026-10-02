@@ -883,7 +883,7 @@ export function Suppliers() {
                   <Input
                     id="supplier-name-field"
                     required
-                    placeholder="e.g. Apex Pharma Agencies / Sun Pharma Distributor"
+                    placeholder="e.g. National Pharma Agencies / MedSupply Wholesale"
                     value={formData.name || ''}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                     className="mt-1 font-medium"

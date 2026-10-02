@@ -376,7 +376,7 @@ export function AuthPage() {
         {/* SCREEN 1: INITIAL AUTHENTICATION SCREEN              */}
         {/* ---------------------------------------------------- */}
         {screen === 'initial' && (
-          <div className="space-y-3.5 pt-2">
+          <div className="space-y-3 pt-2">
             <button
               type="button"
               onClick={() => handleSocialClick('google')}
@@ -404,18 +404,23 @@ export function AuthPage() {
               <span>Continue with Facebook</span>
             </button>
 
-            {/* When user has logged out, offer "More login methods" */}
-            {hasLoggedOut && (
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-                <button
-                  type="button"
-                  onClick={() => setScreen('more-methods')}
-                  className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                >
-                  More login methods
-                </button>
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-800" />
               </div>
-            )}
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">or</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setScreen('email-input')}
+              className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
+            >
+              <Mail className="w-4 h-4 text-slate-500" />
+              <span>Continue with Email</span>
+            </button>
           </div>
         )}
 
@@ -699,7 +704,7 @@ export function AuthPage() {
                       type="text"
                       required
                       autoFocus
-                      placeholder="e.g. Apex Care Pharmacy & Medicals"
+                      placeholder="e.g. MedPlus Pharmacy"
                       value={organizationName}
                       onChange={(e) => setOrganizationName(e.target.value)}
                       className="h-11 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
@@ -796,7 +801,7 @@ export function AuthPage() {
                       type="text"
                       required
                       autoFocus
-                      placeholder="e.g. Dr. Sarah Jenkins"
+                      placeholder="e.g. John Doe"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="h-11 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
@@ -1000,105 +1005,60 @@ export function AuthPage() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Select an account to continue to MediTrack Pharmacy Workspace:
+              Enter your {activeSocialProvider === 'google' ? 'Google' : 'Facebook'} account email to sign in or start workspace registration:
             </p>
 
-            {/* Account List */}
-            <div className="space-y-2">
-              {(activeSocialProvider === 'google' ? [
-                {
-                  email: 'doctor.partner@gmail.com',
-                  name: 'Dr. Gregory House',
-                  isExisting: false,
-                  pharmacyName: 'Apex Health & Pharmacy Cloud'
-                },
-                {
-                  email: 'sarah.mitchell@apexrx.health',
-                  name: 'Dr. Sarah Mitchell',
-                  isExisting: true,
-                  pharmacyName: 'Apex Health & Pharmacy Cloud'
-                }
-              ] : [
-                {
-                  email: 'david.miller@facebook.com',
-                  name: 'David Miller',
-                  isExisting: false,
-                  pharmacyName: 'Miller Care Pharmacy'
-                },
-                {
-                  email: 'marcus.v@metrocare.org',
-                  name: 'Marcus Vance, PharmD',
-                  isExisting: true,
-                  pharmacyName: 'Metro Care Multi-Specialty Clinic'
-                }
-              ]).map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => handleSelectSocialAccount(acc)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-primary-500 hover:bg-primary-50/50 dark:hover:bg-primary-950/30 transition-all flex items-center justify-between text-left"
-                >
-                  <div className="min-w-0 pr-2">
-                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                      {acc.name}
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {acc.email}
-                    </p>
-                  </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    acc.isExisting 
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' 
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                  }`}>
-                    {acc.isExisting ? 'Existing Workspace' : 'New Account'}
-                  </span>
-                </button>
-              ))}
+            <form onSubmit={handleCustomSocialSubmit} className="space-y-3.5 text-left">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="email"
+                  required
+                  autoFocus
+                  placeholder={activeSocialProvider === 'google' ? 'doctor@gmail.com' : 'user@example.com'}
+                  value={customSocialEmail}
+                  onChange={(e) => setCustomSocialEmail(e.target.value)}
+                  className="h-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                />
+              </div>
 
-              {/* Use custom account */}
-              {!isCustomSocialOpen ? (
-                <button
-                  type="button"
-                  onClick={() => setIsCustomSocialOpen(true)}
-                  className="w-full py-2 text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Your Full Name <span className="text-slate-400 font-normal">(optional)</span>
+                </label>
+                <Input
+                  type="text"
+                  placeholder="e.g. John Doe"
+                  value={customSocialName}
+                  onChange={(e) => setCustomSocialName(e.target.value)}
+                  className="h-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="flex-1 h-10 text-xs font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm"
                 >
-                  + Use another {activeSocialProvider} account
-                </button>
-              ) : (
-                <form onSubmit={handleCustomSocialSubmit} className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2 text-left">
-                  <Input
-                    type="email"
-                    required
-                    placeholder="Enter email address"
-                    value={customSocialEmail}
-                    onChange={(e) => setCustomSocialEmail(e.target.value)}
-                    className="h-9 text-xs"
-                  />
-                  <Input
-                    type="text"
-                    placeholder="Your Full Name (optional)"
-                    value={customSocialName}
-                    onChange={(e) => setCustomSocialName(e.target.value)}
-                    className="h-9 text-xs"
-                  />
-                  <div className="flex gap-2 pt-1">
-                    <Button type="submit" size="sm" className="flex-1 h-8 text-xs font-semibold">
-                      Continue
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setIsCustomSocialOpen(false)} 
-                      className="h-8 text-xs"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
+                  {isSubmitting ? 'Verifying...' : 'Continue'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setActiveSocialProvider(null);
+                    setCustomSocialEmail('');
+                    setCustomSocialName('');
+                  }} 
+                  className="h-10 text-xs rounded-xl"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
 
           </div>
         </div>

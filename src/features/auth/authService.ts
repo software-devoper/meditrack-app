@@ -133,70 +133,7 @@ export async function registerWorkspaceUser(payload: NewWorkspacePayload): Promi
   orgs.push(newOrg);
   saveCollectionData('organizations', orgs);
 
-  // 4. Seed essential starter medicines for the workspace
-  const products = getCollectionData('products');
-  products.push(
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Paracetamol 650mg Fast-Action',
-      genericName: 'Paracetamol / Acetaminophen',
-      category: 'Analgesics',
-      manufacturer: 'Apex Pharma Labs',
-      hsnCode: '30049011',
-      unit: 'Strip',
-      purchasePrice: 14.0,
-      mrp: 24.5,
-      gstPercent: 12,
-      stockQty: 100,
-      reorderLevel: 25,
-      rackLocation: 'A-01',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Amoxicillin 500mg Caps',
-      genericName: 'Amoxicillin Trihydrate',
-      category: 'Antibiotics',
-      manufacturer: 'Cipla Healthcare',
-      hsnCode: '30041010',
-      unit: 'Strip',
-      purchasePrice: 42.0,
-      mrp: 65.0,
-      gstPercent: 12,
-      stockQty: 60,
-      reorderLevel: 20,
-      rackLocation: 'B-04',
-      supplierName: 'MediLife Distributors',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    },
-    {
-      id: 'p_' + generateMockId(),
-      tenantId: tenantId,
-      name: 'Cetirizine 10mg Tablets',
-      genericName: 'Cetirizine Dihydrochloride',
-      category: 'Antihistamines',
-      manufacturer: 'Sun Pharma',
-      hsnCode: '30049099',
-      unit: 'Strip',
-      purchasePrice: 18.0,
-      mrp: 28.0,
-      gstPercent: 12,
-      stockQty: 80,
-      reorderLevel: 15,
-      rackLocation: 'C-02',
-      supplierName: 'National Pharma Logistics',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    }
-  );
-  saveCollectionData('products', products);
-
-  // 5. Initialize sales counter
+  // 4. Initialize sales counter
   const metadata = getCollectionData('metadata');
   metadata.push({ id: `${tenantId}_salesCounter`, tenantId: tenantId, current: 0 });
   saveCollectionData('metadata', metadata);
