@@ -71,6 +71,9 @@ export function Layout() {
     if (auth) {
       await signOut(auth);
     }
+    if (user?.contactEmail || user?.internalAuthEmail) {
+      localStorage.setItem('meditrack_last_logged_out_email', (user.contactEmail || user.internalAuthEmail)!.toLowerCase().trim());
+    }
     logout();
     navigate('/login');
   };

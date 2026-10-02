@@ -13,8 +13,14 @@ import {
   Search, 
   X, 
   Loader2, 
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound,
+  ShieldCheck,
+  CheckCircle2,
   Sparkles,
-  RotateCcw
+  LogIn
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { Button, Input } from '../../components/ui';
@@ -26,44 +32,46 @@ import {
   findOrganizationById, 
   registerWorkspaceUser, 
   sendEmailCode, 
-  verifyCode 
+  verifyCode,
+  authenticateWithPassword,
+  getAllRegisteredUsers
 } from './authService';
+import { User, Organization } from '../../types';
 
 type ScreenState = 
   | 'initial'
-  | 'more-methods'
   | 'email-input'
   | 'email-verify'
   | 'onboarding';
-
-interface SocialAccountOption {
-  email: string;
-  name: string;
-  isExisting: boolean;
-  avatar?: string;
-  pharmacyName?: string;
-}
 
 export function AuthPage() {
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
 
+  // Tab State: 'signin' for existing users, 'register' for creating new workspace
+  const [authTab, setAuthTab] = useState<'signin' | 'register'>('signin');
+  const [existingUsers, setExistingUsers] = useState<User[]>([]);
+
   // Screen routing
   const [screen, setScreen] = useState<ScreenState>('initial');
   const [hasLoggedOut, setHasLoggedOut] = useState(false);
 
-  // Email authentication state
+  // Sign-in with password state
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Email authentication state (code verification)
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [sentCode, setSentCode] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
-  // Social account modal simulation
+  // Social account modal state
   const [activeSocialProvider, setActiveSocialProvider] = useState<'google' | 'facebook' | null>(null);
   const [customSocialEmail, setCustomSocialEmail] = useState('');
   const [customSocialName, setCustomSocialName] = useState('');
-  const [isCustomSocialOpen, setIsCustomSocialOpen] = useState(false);
 
   // Onboarding state
   const [onboardingProvider, setOnboardingProvider] = useState<'google' | 'facebook' | 'email'>('email');
@@ -80,8 +88,10 @@ export function AuthPage() {
   // Step 3: Phone Number
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  // Step 4: Full Name
+  // Step 4: Full Name & Account Password
   const [fullName, setFullName] = useState('');
+  const [newAccountPassword, setNewAccountPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Step 5: Profile Picture
   const [profilePicture, setProfilePicture] = useState<string>('');
@@ -92,20 +102,34 @@ export function AuthPage() {
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check if user is already logged in
+  // Load existing registered users & check logout status on mount
+  useEffect(() => {
+    const users = getAllRegisteredUsers();
+    setExistingUsers(users);
+
+    const loggedOut = localStorage.getItem('meditrack_has_logged_out');
+    const lastEmail = localStorage.getItem('meditrack_last_logged_out_email');
+
+    if (loggedOut === 'true' || users.length > 0) {
+      setHasLoggedOut(true);
+      setAuthTab('signin'); // When logged out, ALWAYS show sign-in, never registration!
+      if (lastEmail) {
+        setLoginIdentifier(lastEmail);
+      } else if (users.length > 0 && users[0].contactEmail) {
+        setLoginIdentifier(users[0].contactEmail);
+      }
+    } else {
+      // First time fresh visitor with 0 users: show register tab
+      setAuthTab('register');
+    }
+  }, []);
+
+  // Redirect if already authenticated
   useEffect(() => {
     if (user && user.registrationCompleted !== false) {
       navigate('/');
     }
   }, [user, navigate]);
-
-  // Check if user has previously logged out
-  useEffect(() => {
-    const loggedOut = localStorage.getItem('meditrack_has_logged_out');
-    if (loggedOut === 'true') {
-      setHasLoggedOut(true);
-    }
-  }, []);
 
   // Resend countdown timer
   useEffect(() => {
@@ -116,7 +140,7 @@ export function AuthPage() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  // Stop camera when unmounted or camera deactivated
+  // Stop camera when unmounted
   useEffect(() => {
     return () => {
       stopCamera();
@@ -135,7 +159,7 @@ export function AuthPage() {
   const handleStartCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast.info("Camera not supported on this browser. Please select an image file.");
+        toast.info("Camera not supported on this browser. Please upload an image file.");
         fileInputRef.current?.click();
         return;
       }
@@ -148,8 +172,8 @@ export function AuthPage() {
         videoRef.current.play();
       }
     } catch (err) {
-      console.warn("Camera access denied or unavailable:", err);
-      toast.info("Camera unavailable. You can upload a photo from your device.");
+      console.warn("Camera access denied or unavailable", err);
+      toast.error("Camera access failed. Please upload a photo instead.");
       setIsCameraActive(false);
       fileInputRef.current?.click();
     }
@@ -195,34 +219,90 @@ export function AuthPage() {
     reader.readAsDataURL(file);
   };
 
+  // Quick 1-Click login for an existing registered account
+  const handleQuickLogin = async (targetUser: User) => {
+    setIsSubmitting(true);
+    try {
+      const org = await findOrganizationById(targetUser.tenantId);
+      if (!org) {
+        toast.error('Workspace data not found. Please log in with your credentials.');
+        return;
+      }
+      setUser(targetUser, targetUser.id, org);
+      localStorage.removeItem('meditrack_has_logged_out');
+      localStorage.setItem('meditrack_last_logged_out_email', targetUser.contactEmail || '');
+      toast.success(`Welcome back, ${targetUser.name || 'Doctor'}!`);
+      navigate('/');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to sign into workspace.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Password-based sign in
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = loginIdentifier.trim();
+    if (!cleanId) {
+      toast.error('Please enter your email or username');
+      return;
+    }
+    if (!loginPassword) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { user: authUser, organization: org } = await authenticateWithPassword(cleanId, loginPassword);
+      setUser(authUser, authUser.id, org);
+      localStorage.removeItem('meditrack_has_logged_out');
+      localStorage.setItem('meditrack_last_logged_out_email', authUser.contactEmail || '');
+      toast.success(`Welcome back, ${authUser.name}! Entered ${org.name}`);
+      navigate('/');
+    } catch (err: any) {
+      toast.error(err.message || 'Invalid credentials. Please verify your email/username and password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Google / Facebook sign-in trigger
   const handleSocialClick = (provider: 'google' | 'facebook') => {
     setActiveSocialProvider(provider);
-    setIsCustomSocialOpen(false);
+    setCustomSocialEmail('');
+    setCustomSocialName('');
   };
 
-  const handleSelectSocialAccount = async (account: SocialAccountOption) => {
+  // Submit Social modal form
+  const handleSocialFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = customSocialEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    const provider = activeSocialProvider || 'google';
     setActiveSocialProvider(null);
     setIsSubmitting(true);
 
     try {
-      // Check if user is registered in system
-      const existingUser = await findUserByEmail(account.email);
-      
+      const existingUser = await findUserByEmail(cleanEmail);
       if (existingUser && existingUser.registrationCompleted !== false) {
-        // Registered User -> Go directly to existing workspace
+        // Registered User -> Go directly to existing workspace!
         const org = await findOrganizationById(existingUser.tenantId);
         setUser(existingUser, existingUser.id, org);
         localStorage.removeItem('meditrack_has_logged_out');
+        localStorage.setItem('meditrack_last_logged_out_email', cleanEmail);
         toast.success(`Welcome back, ${existingUser.name || 'Doctor'}!`);
         navigate('/');
       } else {
         // New User -> Begin Onboarding Flow
-        setOnboardingProvider(activeSocialProvider || 'google');
-        setOnboardingEmail(account.email);
-        setFullName(account.name || '');
-        if (account.avatar) setProfilePicture(account.avatar);
-        if (account.pharmacyName) setOrganizationName(account.pharmacyName);
+        setOnboardingProvider(provider);
+        setOnboardingEmail(cleanEmail);
+        setFullName(customSocialName.trim() || cleanEmail.split('@')[0]);
         setCurrentStep(1);
         setScreen('onboarding');
       }
@@ -233,20 +313,7 @@ export function AuthPage() {
     }
   };
 
-  const handleCustomSocialSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customSocialEmail.trim() || !customSocialEmail.includes('@')) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-    handleSelectSocialAccount({
-      email: customSocialEmail.trim(),
-      name: customSocialName.trim() || customSocialEmail.split('@')[0],
-      isExisting: false
-    });
-  };
-
-  // Email authentication submission: Request 6-digit code
+  // Request 6-digit email code
   const handleGetCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
@@ -262,7 +329,12 @@ export function AuthPage() {
       setResendTimer(60);
       setVerificationCode('');
       setScreen('email-verify');
-      toast.success(`Verification code sent to ${cleanEmail}`);
+
+      // Trigger high-visibility toast notification with the code
+      toast.success(`Verification code generated: ${code}`, {
+        duration: 15000,
+        description: 'Code displayed on screen. Click Auto-Fill to apply it.'
+      });
     } catch (err: any) {
       toast.error(err.message || 'Failed to send verification code. Please try again.');
     } finally {
@@ -270,7 +342,7 @@ export function AuthPage() {
     }
   };
 
-  // Email verification submission: Verify 6-digit code
+  // Verify 6-digit email code
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = verificationCode.trim();
@@ -288,18 +360,19 @@ export function AuthPage() {
         return;
       }
 
-      // Code is valid! Check if this email is already registered
+      // Check if email already belongs to a registered workspace owner
       const existingUser = await findUserByEmail(email);
 
       if (existingUser && existingUser.registrationCompleted !== false) {
-        // REGISTERED USER -> Take them directly to their previously registered workspace!
+        // User already has a registered workspace -> log straight in!
         const org = await findOrganizationById(existingUser.tenantId);
         setUser(existingUser, existingUser.id, org);
         localStorage.removeItem('meditrack_has_logged_out');
-        toast.success(`Welcome back, ${existingUser.name || 'Doctor'}!`);
+        localStorage.setItem('meditrack_last_logged_out_email', existingUser.contactEmail || '');
+        toast.success(`Welcome back, ${existingUser.name || 'Doctor'}! Entered ${org?.name || 'Workspace'}`);
         navigate('/');
       } else {
-        // NEW EMAIL -> Treat as new registration and start 5-step onboarding
+        // Brand new email -> proceed to onboarding setup
         setOnboardingProvider('email');
         setOnboardingEmail(email.trim().toLowerCase());
         setFullName(existingUser?.name || '');
@@ -313,7 +386,7 @@ export function AuthPage() {
     }
   };
 
-  // Country calling code automatically determined by selected nationality
+  // Nationality dial code
   const dialCode = getDialCodeForNationality(selectedNationality);
 
   // Complete onboarding and enter workspace
@@ -331,11 +404,13 @@ export function AuthPage() {
         organizationName: organizationName.trim(),
         phone: fullPhone,
         fullName: fullName.trim(),
-        avatarUrl: profilePicture
+        avatarUrl: profilePicture,
+        password: newAccountPassword.trim() || undefined
       });
 
       setUser(createdUser, createdUser.id, createdOrg);
       localStorage.removeItem('meditrack_has_logged_out');
+      localStorage.setItem('meditrack_last_logged_out_email', createdUser.contactEmail || '');
       toast.success(`Workspace created! Welcome to ${createdOrg.name}`);
       navigate('/');
     } catch (err: any) {
@@ -357,32 +432,209 @@ export function AuthPage() {
       <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 transition-all">
         
         {/* Brand Header */}
-        <div className="flex flex-col items-center text-center mb-6">
-          <div className="flex items-center gap-2.5 mb-2">
+        <div className="flex flex-col items-center text-center mb-5">
+          <div className="flex items-center gap-2.5 mb-1.5">
             <Logo className="w-8 h-8" />
             <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
               MediTrack
             </span>
           </div>
-          
-          {screen === 'initial' && (
-            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mt-1 leading-relaxed">
-              Manage your pharmacy, organization, medicines, and daily operations from one simple workspace.
-            </p>
-          )}
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
+            Pharmacy ERP & Workspace Management Platform
+          </p>
         </div>
 
         {/* ---------------------------------------------------- */}
-        {/* SCREEN 1: INITIAL AUTHENTICATION SCREEN              */}
+        {/* TAB SWITCHER: SIGN IN vs REGISTER WORKSPACE          */}
         {/* ---------------------------------------------------- */}
         {screen === 'initial' && (
-          <div className="space-y-3 pt-2">
+          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1 mb-5">
+            <button
+              type="button"
+              onClick={() => setAuthTab('signin')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                authTab === 'signin'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthTab('register')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                authTab === 'register'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Register Workspace</span>
+            </button>
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* SCREEN 1: INITIAL SCREEN (SIGN IN OR REGISTER)       */}
+        {/* ---------------------------------------------------- */}
+        {screen === 'initial' && authTab === 'signin' && (
+          <div className="space-y-4">
+            
+            {/* Quick Login if accounts already exist on this device */}
+            {existingUsers.length > 0 && (
+              <div className="p-3.5 rounded-xl border border-primary-200 dark:border-primary-800/50 bg-primary-50/50 dark:bg-primary-950/20 space-y-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300">
+                    Existing Workspace Found
+                  </span>
+                  <span className="text-[10px] bg-primary-100 dark:bg-primary-900/60 text-primary-800 dark:text-primary-200 px-2 py-0.5 rounded-full font-semibold">
+                    Ready
+                  </span>
+                </div>
+
+                {existingUsers.slice(0, 2).map((u) => (
+                  <div key={u.id} className="flex items-center justify-between pt-1">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        {u.organizationName || 'Pharmacy Workspace'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {u.name} ({u.contactEmail || u.internalAuthEmail})
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleQuickLogin(u)}
+                      disabled={isSubmitting}
+                      className="h-8 text-xs font-semibold px-3 shrink-0 rounded-lg bg-primary-600 hover:bg-primary-700 text-white"
+                    >
+                      Sign In
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Password Login Form */}
+            <form onSubmit={handlePasswordLogin} className="space-y-3 text-left">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Email or Username
+                </label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="text"
+                    required
+                    placeholder="doctor@pharmacy.com or username"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    className="h-10 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="h-10 pl-10 pr-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full h-10 text-xs font-bold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all mt-1"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Signing In...
+                  </span>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+            </form>
+
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+              </div>
+              <div className="relative flex justify-center text-[11px]">
+                <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">or continue with</span>
+              </div>
+            </div>
+
+            {/* Social Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSocialClick('google')}
+                className="h-10 px-3 flex items-center justify-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.28-2.09 3.66-5.17 3.66-9.14z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.04c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.13C3.26 21.43 7.31 24 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.59H1.24C.45 8.16 0 9.99 0 12s.45 3.84 1.24 5.41l4.04-3.13z"/>
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.57 1.24 6.59l4.04 3.13c.95-2.83 3.6-4.97 6.72-4.97z"/>
+                </svg>
+                <span>Google</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSocialClick('facebook')}
+                className="h-10 px-3 flex items-center justify-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="#1877F2">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+                <span>Facebook</span>
+              </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* SCREEN 1: REGISTER WORKSPACE TAB                     */}
+        {/* ---------------------------------------------------- */}
+        {screen === 'initial' && authTab === 'register' && (
+          <div className="space-y-3 pt-1">
+            <div className="text-center pb-1">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Register a New Pharmacy Workspace
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Set up your clinic, stock records, and billing in under 2 minutes.
+              </p>
+            </div>
+
             <button
               type="button"
               onClick={() => handleSocialClick('google')}
               className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
             >
-              {/* Google G Logo */}
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.28-2.09 3.66-5.17 3.66-9.14z"/>
                 <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.04c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.13C3.26 21.43 7.31 24 12 24z"/>
@@ -397,7 +649,6 @@ export function AuthPage() {
               onClick={() => handleSocialClick('facebook')}
               className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
             >
-              {/* Facebook Logo */}
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#1877F2">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>
@@ -419,16 +670,16 @@ export function AuthPage() {
               className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
             >
               <Mail className="w-4 h-4 text-slate-500" />
-              <span>Continue with Email</span>
+              <span>Register with Email</span>
             </button>
           </div>
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* SCREEN 2: MORE LOGIN METHODS                         */}
+        {/* SCREEN 2: EMAIL INPUT (GET 6-DIGIT CODE)             */}
         {/* ---------------------------------------------------- */}
-        {screen === 'more-methods' && (
-          <div className="space-y-4">
+        {screen === 'email-input' && (
+          <form onSubmit={handleGetCode} className="space-y-4">
             <button
               type="button"
               onClick={() => setScreen('initial')}
@@ -438,55 +689,24 @@ export function AuthPage() {
               <span>Back</span>
             </button>
 
-            <div className="text-center pb-1">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                More login methods
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setScreen('email-input')}
-              className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
-            >
-              <Mail className="w-4 h-4 text-slate-500" />
-              <span>Continue with Email</span>
-            </button>
-          </div>
-        )}
-
-        {/* ---------------------------------------------------- */}
-        {/* SCREEN 3: EMAIL INPUT                                */}
-        {/* ---------------------------------------------------- */}
-        {screen === 'email-input' && (
-          <form onSubmit={handleGetCode} className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setScreen('more-methods')}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mb-1"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-
             <div className="text-center pb-2">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Please enter your email
+                Enter your email address
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                We'll send a 6-digit verification code to this address.
+                We'll issue a 6-digit verification code to confirm your identity.
               </p>
             </div>
 
             <div className="space-y-1.5 text-left">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Email address
+                Email address <span className="text-red-500">*</span>
               </label>
               <Input
                 type="email"
                 required
                 autoFocus
-                placeholder="name@pharmacy.com"
+                placeholder="doctor@pharmacy.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
@@ -500,17 +720,17 @@ export function AuthPage() {
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Sending Code...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Generating Code...
                 </span>
               ) : (
-                'Get Code'
+                'Get Verification Code'
               )}
             </Button>
           </form>
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* SCREEN 4: EMAIL CODE VERIFICATION                    */}
+        {/* SCREEN 3: EMAIL CODE VERIFICATION                    */}
         {/* ---------------------------------------------------- */}
         {screen === 'email-verify' && (
           <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -520,37 +740,49 @@ export function AuthPage() {
               className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mb-1"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
+              <span>Change email</span>
             </button>
 
-            <div className="text-center pb-2">
+            <div className="text-center pb-1">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-                Enter the 6-digit code
+                Enter the 6-Digit Code
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Sent to <span className="font-semibold text-slate-700 dark:text-slate-300">{email}</span>
+                Sent for <strong className="text-slate-800 dark:text-slate-200">{email}</strong>
               </p>
             </div>
 
-            {/* Quick Helper for immediate review/testing */}
+            {/* Prominent On-Screen Verification Code Display */}
             {sentCode && (
-              <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs">
-                <span className="text-emerald-800 dark:text-emerald-300">
-                  Verification Code: <strong className="font-mono tracking-widest">{sentCode}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setVerificationCode(sentCode)}
-                  className="text-emerald-700 dark:text-emerald-400 hover:underline font-semibold text-[11px]"
-                >
-                  Use Code
-                </button>
+              <div className="p-3.5 rounded-xl bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800/60 text-left space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-primary-900 dark:text-primary-200">
+                    <ShieldCheck className="w-4 h-4 text-primary-600" />
+                    <span className="text-xs font-bold">Verification Code</span>
+                  </div>
+                  <span className="font-mono text-base font-extrabold tracking-widest bg-white dark:bg-slate-900 px-3 py-1 rounded-lg border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 shadow-2xs">
+                    {sentCode}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 pt-1">
+                  <span>Enter the code below to verify:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVerificationCode(sentCode);
+                      toast.success(`Code ${sentCode} auto-filled!`);
+                    }}
+                    className="font-bold text-primary-600 hover:text-primary-700 dark:text-primary-400 underline cursor-pointer"
+                  >
+                    Auto-Fill Code
+                  </button>
+                </div>
               </div>
             )}
 
             <div className="space-y-1.5 text-left">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                6-digit verification code
+                6-digit code
               </label>
               <Input
                 type="text"
@@ -559,7 +791,7 @@ export function AuthPage() {
                 placeholder="123456"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                className="h-11 text-center font-mono tracking-widest text-lg bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                className="h-12 text-center font-mono tracking-widest text-xl font-bold bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
               />
             </div>
 
@@ -570,10 +802,10 @@ export function AuthPage() {
             >
               {isVerifying ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying Code...
                 </span>
               ) : (
-                'Verify & Continue'
+                'Verify & Proceed'
               )}
             </Button>
 
@@ -591,7 +823,7 @@ export function AuthPage() {
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* SCREEN 5: ONBOARDING PROCESS (5 CLEAN STEPS)         */}
+        {/* SCREEN 4: ONBOARDING PROCESS (5 STEPS)               */}
         {/* ---------------------------------------------------- */}
         {screen === 'onboarding' && (
           <div className="space-y-5">
@@ -601,7 +833,7 @@ export function AuthPage() {
                 type="button"
                 onClick={() => {
                   if (currentStep > 1) {
-                    setCurrentStep((currentStep - 1) as any);
+                    setCurrentStep((prev) => (prev - 1) as any);
                   } else {
                     setScreen('initial');
                   }
@@ -609,12 +841,26 @@ export function AuthPage() {
                 className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
+                <span>{currentStep === 1 ? 'Cancel' : 'Back'}</span>
               </button>
-              
-              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wider">
-                Step {currentStep} of 5
-              </span>
+
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <div
+                    key={s}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      s === currentStep
+                        ? 'w-6 bg-primary-600'
+                        : s < currentStep
+                        ? 'w-2 bg-emerald-500'
+                        : 'w-2 bg-slate-200 dark:bg-slate-700'
+                    }`}
+                  />
+                ))}
+                <span className="text-[11px] font-semibold text-slate-400 ml-1">
+                  Step {currentStep} of 5
+                </span>
+              </div>
             </div>
 
             {/* STEP 1: NATIONALITY */}
@@ -622,48 +868,45 @@ export function AuthPage() {
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your nationality?
+                    Where is your pharmacy registered?
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Select your nationality to automatically set your regional country code and compliance.
+                    Select your country for local taxes, currency, and dialing codes.
                   </p>
                 </div>
 
-                {/* Country Search */}
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     type="text"
-                    placeholder="Search nationality or country..."
+                    placeholder="Search country or nationality..."
                     value={nationalitySearch}
                     onChange={(e) => setNationalitySearch(e.target.value)}
-                    className="h-9 pl-9 text-xs bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-lg"
+                    className="h-10 pl-9 text-xs bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl"
                   />
                 </div>
 
-                {/* Nationalities List */}
-                <div className="max-h-52 overflow-y-auto space-y-1 pr-1 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 bg-slate-50/50 dark:bg-slate-950/50">
+                <div className="max-h-56 overflow-y-auto space-y-1 pr-1 border border-slate-100 dark:border-slate-800/80 rounded-xl p-1 bg-slate-50/50 dark:bg-slate-950/30">
                   {filteredCountries.map((c) => {
-                    const isSelected = selectedNationality.toLowerCase() === c.nationality.toLowerCase();
+                    const isSelected = selectedNationality === c.nationality;
                     return (
                       <button
                         key={c.code}
                         type="button"
                         onClick={() => setSelectedNationality(c.nationality)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all text-left ${
+                        className={`w-full px-3 py-2 rounded-lg text-left text-xs font-medium flex items-center justify-between transition-colors ${
                           isSelected
                             ? 'bg-primary-600 text-white font-semibold shadow-xs'
-                            : 'hover:bg-slate-200/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 truncate">
-                          <span className="text-base">{c.flag}</span>
-                          <span className="truncate">{c.nationality}</span>
-                          <span className={`text-[11px] ${isSelected ? 'text-primary-100' : 'text-slate-400'}`}>
-                            ({c.name})
+                        <div className="flex items-center gap-2 truncate">
+                          <span>{c.name}</span>
+                          <span className={isSelected ? 'text-primary-100' : 'text-slate-400'}>
+                            ({c.nationality})
                           </span>
                         </div>
-                        <span className={`font-mono text-[11px] font-semibold ${isSelected ? 'text-primary-100' : 'text-slate-400'}`}>
+                        <span className={`font-mono text-[11px] shrink-0 ${isSelected ? 'text-white' : 'text-slate-400'}`}>
                           {c.dialCode}
                         </span>
                       </button>
@@ -674,10 +917,9 @@ export function AuthPage() {
                 <Button
                   type="button"
                   onClick={() => setCurrentStep(2)}
-                  disabled={!selectedNationality}
                   className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all"
                 >
-                  Next Step
+                  Next: Pharmacy Name
                 </Button>
               </div>
             )}
@@ -687,10 +929,10 @@ export function AuthPage() {
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your Pharmacy or Organization name?
+                    What is your pharmacy workspace name?
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    This will be the title of your pharmacy workspace and will appear on sales bills and invoices.
+                    This appears on receipts, invoice headers, and audit reports.
                   </p>
                 </div>
 
@@ -716,7 +958,7 @@ export function AuthPage() {
                   type="button"
                   onClick={() => {
                     if (!organizationName.trim()) {
-                      toast.error('Please enter your Pharmacy or Organization name');
+                      toast.error('Please enter your pharmacy name');
                       return;
                     }
                     setCurrentStep(3);
@@ -724,20 +966,20 @@ export function AuthPage() {
                   disabled={!organizationName.trim()}
                   className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all"
                 >
-                  Next Step
+                  Next: Phone Number
                 </Button>
               </div>
             )}
 
-            {/* STEP 3: PHONE NUMBER (AUTOMATIC COUNTRY CODE) */}
+            {/* STEP 3: PHONE NUMBER */}
             {currentStep === 3 && (
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your phone number?
+                    Enter your contact phone number
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    The country code is automatically set to <span className="font-semibold">{dialCode}</span> based on your nationality ({selectedNationality}).
+                    Used for critical low-stock alerts, login recovery, and SMS invoices.
                   </p>
                 </div>
 
@@ -745,8 +987,8 @@ export function AuthPage() {
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Phone Number <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent transition-all overflow-hidden h-11">
-                    <div className="h-full px-3.5 bg-slate-100 dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 flex items-center justify-center font-mono font-semibold text-sm text-slate-800 dark:text-slate-200 shrink-0 select-none">
+                  <div className="flex items-center h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent">
+                    <div className="px-3.5 h-full bg-slate-50 dark:bg-slate-800/60 border-r border-slate-200 dark:border-slate-700 flex items-center justify-center font-mono text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0">
                       {dialCode}
                     </div>
                     <input
@@ -774,20 +1016,20 @@ export function AuthPage() {
                   disabled={phoneNumber.replace(/\D/g, '').length < 7}
                   className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all"
                 >
-                  Next Step
+                  Next: Admin Name & Password
                 </Button>
               </div>
             )}
 
-            {/* STEP 4: FULL NAME */}
+            {/* STEP 4: FULL NAME & CREATE PASSWORD */}
             {currentStep === 4 && (
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your full name?
+                    Admin Profile & Password
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Your name as the registered pharmacy owner or lead practitioner.
+                    Your practitioner name and secure password for logging back in anytime.
                   </p>
                 </div>
 
@@ -809,6 +1051,33 @@ export function AuthPage() {
                   </div>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Create Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      placeholder="At least 6 characters"
+                      value={newAccountPassword}
+                      onChange={(e) => setNewAccountPassword(e.target.value)}
+                      className="h-11 pl-10 pr-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    You can use this password to sign back in quickly whenever you log out.
+                  </p>
+                </div>
+
                 <Button
                   type="button"
                   onClick={() => {
@@ -816,71 +1085,74 @@ export function AuthPage() {
                       toast.error('Please enter your full name');
                       return;
                     }
+                    if (newAccountPassword && newAccountPassword.length < 6) {
+                      toast.error('Password must be at least 6 characters');
+                      return;
+                    }
                     setCurrentStep(5);
                   }}
                   disabled={!fullName.trim()}
                   className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all"
                 >
-                  Next Step
+                  Next: Profile Picture
                 </Button>
               </div>
             )}
 
             {/* STEP 5: PROFILE PICTURE */}
             {currentStep === 5 && (
-              <div className="space-y-5 text-center">
+              <div className="space-y-4 text-center">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Add your profile picture
+                    Add a profile photo (Optional)
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Upload an avatar or take a photo. You can also skip this step.
+                    Upload an avatar or snap a quick webcam photo for your pharmacy badge.
                   </p>
                 </div>
 
-                {/* Circular Profile Preview */}
-                <div className="flex flex-col items-center justify-center">
-                  <div className="relative w-24 h-24 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 p-1 flex items-center justify-center bg-slate-50 dark:bg-slate-800 overflow-hidden shadow-inner">
+                {/* Avatar Display */}
+                <div className="flex justify-center my-3">
+                  <div className="relative w-28 h-28 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center bg-slate-50 dark:bg-slate-800/50 overflow-hidden shadow-inner">
                     {profilePicture ? (
                       <img 
                         src={profilePicture} 
-                        alt="Profile preview" 
-                        className="w-full h-full object-cover rounded-full" 
+                        alt="Profile Preview" 
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <UserIcon className="w-10 h-10 text-slate-400" />
+                      <UserIcon className="w-12 h-12 text-slate-300 dark:text-slate-600" />
                     )}
 
                     {profilePicture && (
                       <button
                         type="button"
                         onClick={() => setProfilePicture('')}
-                        title="Remove photo"
-                        className="absolute inset-0 bg-black/40 text-white opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity rounded-full"
+                        className="absolute bottom-1 right-1 p-1 bg-red-600 text-white rounded-full shadow-md hover:bg-red-700 transition-colors"
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Camera Stream View if active */}
+                {/* Camera View */}
                 {isCameraActive && (
-                  <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+                  <div className="space-y-2 p-3 rounded-xl bg-slate-900 border border-slate-800">
                     <video 
                       ref={videoRef} 
                       autoPlay 
                       playsInline 
                       muted 
-                      className="w-full max-h-48 rounded-lg object-cover bg-black" 
+                      className="w-full h-44 object-cover rounded-lg bg-black"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex items-center justify-center gap-2 pt-1">
                       <Button 
                         type="button" 
                         onClick={handleCapturePhoto} 
-                        className="flex-1 h-9 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                        className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700"
                       >
-                        Capture Photo
+                        <Camera className="w-3.5 h-3.5 mr-1.5" /> Capture Photo
                       </Button>
                       <Button 
                         type="button" 
@@ -925,7 +1197,7 @@ export function AuthPage() {
                   </div>
                 )}
 
-                {/* Final Next Step / Enter Workspace */}
+                {/* Final Enter Workspace Button */}
                 <div className="pt-2 space-y-2">
                   <Button
                     type="button"
@@ -935,10 +1207,10 @@ export function AuthPage() {
                   >
                     {isSubmitting ? (
                       <span className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Entering Workspace...
+                        <Loader2 className="w-4 h-4 animate-spin" /> Creating Workspace...
                       </span>
                     ) : (
-                      'Next Step'
+                      'Complete & Enter Workspace'
                     )}
                   </Button>
 
@@ -949,7 +1221,7 @@ export function AuthPage() {
                       disabled={isSubmitting}
                       className="text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors block w-full py-1"
                     >
-                      Skip for now
+                      Skip photo & enter workspace
                     </button>
                   )}
                 </div>
@@ -971,7 +1243,7 @@ export function AuthPage() {
       </div>
 
       {/* ---------------------------------------------------- */}
-      {/* SOCIAL ACCOUNT SELECTION MODAL (GOOGLE & FACEBOOK)   */}
+      {/* SOCIAL ACCOUNT PROMPT MODAL (GOOGLE & FACEBOOK)      */}
       {/* ---------------------------------------------------- */}
       {activeSocialProvider && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -1005,10 +1277,10 @@ export function AuthPage() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Enter your {activeSocialProvider === 'google' ? 'Google' : 'Facebook'} account email to sign in or start workspace registration:
+              Enter your {activeSocialProvider === 'google' ? 'Google' : 'Facebook'} account email to sign in or register:
             </p>
 
-            <form onSubmit={handleCustomSocialSubmit} className="space-y-3.5 text-left">
+            <form onSubmit={handleSocialFormSubmit} className="space-y-3.5 text-left">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Email Address <span className="text-red-500">*</span>

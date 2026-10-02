@@ -132,21 +132,16 @@ export const getApps = () => [{ name: '[MockApp]' }];
 export const getApp = () => ({ name: '[MockApp]' });
 
 // Helper to get passwords from localStorage
-function getStoredPasswords(): Record<string, string> {
+export function getStoredPasswords(): Record<string, string> {
   try {
     const raw = localStorage.getItem('meditrack_mock_passwords');
-    return raw ? JSON.parse(raw) : { 
-      'admin': 'admin123', 
-      'admin@meditrack.local': 'admin123', 
-      'sarah.mitchell@apexrx.health': 'admin123',
-      'marcus_rx': 'marcus123'
-    };
+    return raw ? JSON.parse(raw) : {};
   } catch (_) {
-    return { 'admin': 'admin123' };
+    return {};
   }
 }
 
-function saveStoredPassword(key: string, pass: string) {
+export function saveStoredPassword(key: string, pass: string) {
   const current = getStoredPasswords();
   current[key.toLowerCase().trim()] = pass;
   localStorage.setItem('meditrack_mock_passwords', JSON.stringify(current));

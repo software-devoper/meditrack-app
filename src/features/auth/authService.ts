@@ -3,7 +3,9 @@ import {
   getCollectionData, 
   saveCollectionData, 
   generateMockId, 
-  switchWorkspace 
+  switchWorkspace,
+  saveStoredPassword,
+  getStoredPasswords
 } from '../../lib/firebase-mock';
 import { 
   issueEmailVerificationCode, 
@@ -22,6 +24,55 @@ export async function findUserByEmail(email: string): Promise<User | null> {
     (u.internalAuthEmail && u.internalAuthEmail.toLowerCase() === normalized)
   );
   return matched || null;
+}
+
+/**
+ * Returns all registered users from the local storage
+ */
+export function getAllRegisteredUsers(): User[] {
+  const users = getCollectionData('users');
+  return users.filter((u: User) => u.registrationCompleted !== false);
+}
+
+/**
+ * Authenticates user using email/username and password
+ */
+export async function authenticateWithPassword(
+  emailOrUsername: string, 
+  password: string
+): Promise<{ user: User; organization: Organization }> {
+  const normalized = emailOrUsername.trim().toLowerCase();
+  const users = getCollectionData('users');
+  const matched = users.find((u: User) => 
+    (u.contactEmail && u.contactEmail.toLowerCase() === normalized) ||
+    (u.internalAuthEmail && u.internalAuthEmail.toLowerCase() === normalized) ||
+    (u.username && u.username.toLowerCase() === normalized)
+  );
+
+  if (!matched) {
+    throw new Error('No registered account was found with that email or username.');
+  }
+
+  const passwords = getStoredPasswords();
+  const expectedPass = 
+    passwords[matched.contactEmail?.toLowerCase() || ''] || 
+    passwords[matched.internalAuthEmail?.toLowerCase() || ''] || 
+    passwords[matched.username?.toLowerCase() || ''];
+
+  if (expectedPass && expectedPass !== password) {
+    throw new Error('Incorrect password. Please verify and try again.');
+  }
+
+  const org = await findOrganizationById(matched.tenantId);
+  if (!org) {
+    throw new Error('Workspace details could not be found.');
+  }
+
+  try {
+    switchWorkspace(org.id);
+  } catch (_) {}
+
+  return { user: matched, organization: org };
 }
 
 /**
@@ -57,6 +108,7 @@ export interface NewWorkspacePayload {
   phone: string;
   fullName: string;
   avatarUrl?: string;
+  password?: string;
 }
 
 /**
@@ -125,6 +177,12 @@ export async function registerWorkspaceUser(payload: NewWorkspacePayload): Promi
     createdBy: `${payload.authProvider}_registration`,
     emailVerified: true
   };
+
+  // Save password if provided
+  if (payload.password) {
+    saveStoredPassword(normalizedEmail, payload.password);
+    saveStoredPassword(username, payload.password);
+  }
 
   // 3. Save to storage
   users.push(newUser);
