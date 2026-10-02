@@ -8,6 +8,7 @@ import { Sales } from './features/sales/Sales';
 import { Purchase } from './features/purchase/Purchase';
 import { AuthPage } from './features/auth/AuthPage';
 import { Bootstrap } from './features/auth/Bootstrap';
+import { PrivacyPolicy } from './features/legal/PrivacyPolicy';
 import { Profile } from './features/profile/Profile';
 import { Settings } from './features/settings/Settings';
 import { useAuthStore } from './store/useAuthStore';
@@ -126,6 +127,8 @@ export default function App() {
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/data-deletion" element={<PrivacyPolicy />} />
         
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />

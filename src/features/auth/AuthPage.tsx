@@ -953,6 +953,16 @@ export function AuthPage() {
           </div>
         )}
 
+        {/* Footer Privacy Link */}
+        <div className="mt-5 pt-3 text-center border-t border-slate-100 dark:border-slate-800">
+          <a
+            href="/privacy"
+            className="text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+          >
+            Privacy Policy & Data Deletion
+          </a>
+        </div>
+
       </div>
 
       {/* ---------------------------------------------------- */}
