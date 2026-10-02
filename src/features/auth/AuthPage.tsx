@@ -9,28 +9,25 @@ import {
   Search, 
   X, 
   Loader2, 
-  ShieldCheck, 
-  CheckCircle2, 
   Check,
   Building2,
   Phone,
-  User as UserIcon,
-  Globe
+  User as UserIcon
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { Button, Input } from '../../components/ui';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/useAuthStore';
-import { COUNTRIES, CountryInfo, findCountry, getDialCodeForNationality } from './countries';
+import { COUNTRIES, CountryInfo, getDialCodeForNationality } from './countries';
 import { 
   findUserByEmail, 
   findOrganizationById, 
   registerWorkspaceUser, 
   sendEmailCode, 
-  verifyCode,
-  getAllRegisteredUsers
+  verifyCode
 } from './authService';
-import { User } from '../../types';
+import { switchWorkspace } from '../../lib/firebase-mock';
+import { validateEmail } from '../../lib/emailValidation';
 
 type ScreenState = 
   | 'initial'
@@ -43,24 +40,22 @@ export function AuthPage() {
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
 
-  // Screen routing
+  // Screen routing state
   const [screen, setScreen] = useState<ScreenState>('initial');
   const [hasLoggedOut, setHasLoggedOut] = useState(false);
-  const [existingUsers, setExistingUsers] = useState<User[]>([]);
 
-  // Email authentication state (code verification)
+  // Email authentication state
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [sentCode, setSentCode] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
-  // Social account prompt modal state
+  // Social account modal state (Google & Facebook authentication)
   const [activeSocialProvider, setActiveSocialProvider] = useState<'google' | 'facebook' | null>(null);
   const [customSocialEmail, setCustomSocialEmail] = useState('');
   const [customSocialName, setCustomSocialName] = useState('');
 
-  // Onboarding state (5 steps)
+  // Unified 5-Step Onboarding state
   const [onboardingProvider, setOnboardingProvider] = useState<'google' | 'facebook' | 'email'>('google');
   const [onboardingEmail, setOnboardingEmail] = useState('');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -72,7 +67,7 @@ export function AuthPage() {
   // Step 2: Pharmacy / Organization Name
   const [organizationName, setOrganizationName] = useState('');
 
-  // Step 3: Phone Number
+  // Step 3: Phone Number (country code automatically resolved from Step 1)
   const [phoneNumber, setPhoneNumber] = useState('');
 
   // Step 4: Full Name
@@ -84,25 +79,17 @@ export function AuthPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Loading / Submission state
+  // Global submission loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check login / logout status on mount
+  // Check login/logout status on mount
   useEffect(() => {
-    const users = getAllRegisteredUsers();
-    setExistingUsers(users);
-
-    const loggedOut = localStorage.getItem('meditrack_has_logged_out');
-    const lastEmail = localStorage.getItem('meditrack_last_logged_out_email');
-
-    if (loggedOut === 'true' || users.length > 0) {
-      setHasLoggedOut(true);
-      if (lastEmail) {
-        setEmail(lastEmail);
-      } else if (users.length > 0 && users[0].contactEmail) {
-        setEmail(users[0].contactEmail);
+    try {
+      const loggedOut = localStorage.getItem('meditrack_has_logged_out');
+      if (loggedOut === 'true') {
+        setHasLoggedOut(true);
       }
-    }
+    } catch (_) {}
   }, []);
 
   // Redirect if already authenticated
@@ -121,7 +108,7 @@ export function AuthPage() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  // Stop camera stream on unmount
+  // Clean up camera stream on unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -200,19 +187,20 @@ export function AuthPage() {
     reader.readAsDataURL(file);
   };
 
-  // Trigger Social Sign-in modal
+  // Trigger Google / Facebook authentication
   const handleSocialClick = (provider: 'google' | 'facebook') => {
     setActiveSocialProvider(provider);
     setCustomSocialEmail('');
     setCustomSocialName('');
   };
 
-  // Submit Social Modal
+  // Complete Google / Facebook authentication
   const handleSocialFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = customSocialEmail.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      toast.error('Please enter a valid email address');
+    const validation = validateEmail(cleanEmail);
+    if (!validation.isValid) {
+      toast.error(validation.error || 'Please enter a valid email address');
       return;
     }
 
@@ -223,18 +211,22 @@ export function AuthPage() {
     try {
       const existingUser = await findUserByEmail(cleanEmail);
       if (existingUser && existingUser.registrationCompleted !== false) {
-        // Registered User -> Log directly into existing workspace
+        // EXISTING USER -> Load account & enter existing workspace directly
         const org = await findOrganizationById(existingUser.tenantId);
+        try {
+          if (org) switchWorkspace(org.id);
+        } catch (_) {}
         setUser(existingUser, existingUser.id, org);
         localStorage.removeItem('meditrack_has_logged_out');
-        localStorage.setItem('meditrack_last_logged_out_email', cleanEmail);
-        toast.success(`Welcome back, ${existingUser.name || 'Doctor'}!`);
+        toast.success(`Welcome back, ${existingUser.name || 'User'}!`);
         navigate('/');
       } else {
-        // New User -> Begin Onboarding Flow
+        // NEW USER -> Begin 5-step onboarding flow
         setOnboardingProvider(provider);
         setOnboardingEmail(cleanEmail);
-        setFullName(customSocialName.trim() || cleanEmail.split('@')[0]);
+        if (customSocialName.trim()) {
+          setFullName(customSocialName.trim());
+        }
         setCurrentStep(1);
         setScreen('onboarding');
       }
@@ -245,27 +237,24 @@ export function AuthPage() {
     }
   };
 
-  // Request 6-digit email code
+  // Request 6-digit email OTP
   const handleGetCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      toast.error('Please enter a valid email address (e.g. doctor@pharmacy.com)');
+    const validation = validateEmail(cleanEmail);
+    if (!validation.isValid) {
+      toast.error(validation.error || 'Please enter a valid email address');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const code = sendEmailCode(cleanEmail);
-      setSentCode(code);
+      sendEmailCode(cleanEmail);
       setResendTimer(60);
       setVerificationCode('');
       setScreen('email-verify');
 
-      toast.success(`Verification code generated: ${code}`, {
-        duration: 15000,
-        description: `6-digit code sent to ${cleanEmail}. Click Auto-Fill to apply.`
-      });
+      toast.success(`Verification code sent to ${cleanEmail}`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to send verification code. Please try again.');
     } finally {
@@ -273,12 +262,12 @@ export function AuthPage() {
     }
   };
 
-  // Verify 6-digit email code
+  // Verify 6-digit email OTP
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = verificationCode.trim();
     if (cleanCode.length !== 6) {
-      toast.error('Please enter the full 6-digit verification code');
+      toast.error('Please enter the complete 6-digit verification code');
       return;
     }
 
@@ -291,22 +280,23 @@ export function AuthPage() {
         return;
       }
 
-      // Check if email already belongs to a registered workspace user
+      // Check whether this email belongs to an existing registered user
       const existingUser = await findUserByEmail(email);
 
       if (existingUser && existingUser.registrationCompleted !== false) {
-        // Registered User -> Log directly into existing account without asking onboarding questions
+        // EXISTING USER -> Enter workspace directly
         const org = await findOrganizationById(existingUser.tenantId);
+        try {
+          if (org) switchWorkspace(org.id);
+        } catch (_) {}
         setUser(existingUser, existingUser.id, org);
         localStorage.removeItem('meditrack_has_logged_out');
-        localStorage.setItem('meditrack_last_logged_out_email', existingUser.contactEmail || '');
-        toast.success(`Welcome back, ${existingUser.name || 'Doctor'}! Entered ${org?.name || 'Workspace'}`);
+        toast.success(`Welcome back, ${existingUser.name || 'User'}!`);
         navigate('/');
       } else {
-        // New User -> Treat as new registration, proceed to Step 1 onboarding
+        // NEW USER -> Begin 5-step onboarding flow
         setOnboardingProvider('email');
         setOnboardingEmail(email.trim().toLowerCase());
-        setFullName(existingUser?.name || '');
         setCurrentStep(1);
         setScreen('onboarding');
       }
@@ -317,10 +307,10 @@ export function AuthPage() {
     }
   };
 
-  // Automatically determined calling code based on selected nationality
+  // Automatically determine country calling code based on selected nationality in Step 1
   const dialCode = getDialCodeForNationality(selectedNationality);
 
-  // Validate step before advancing
+  // Advance through 5 onboarding steps with validation
   const handleNextStep = () => {
     if (currentStep === 1) {
       if (!selectedNationality) {
@@ -337,7 +327,7 @@ export function AuthPage() {
     } else if (currentStep === 3) {
       const cleanDigits = phoneNumber.replace(/\D/g, '');
       if (cleanDigits.length < 7) {
-        toast.error('Please enter a valid phone number');
+        toast.error('Please enter a valid phone number (at least 7 digits)');
         return;
       }
       setCurrentStep(4);
@@ -352,7 +342,7 @@ export function AuthPage() {
     }
   };
 
-  // Complete onboarding and enter workspace
+  // Complete registration and enter workspace automatically
   const handleCompleteOnboarding = async () => {
     setIsSubmitting(true);
     try {
@@ -372,11 +362,10 @@ export function AuthPage() {
 
       setUser(createdUser, createdUser.id, createdOrg);
       localStorage.removeItem('meditrack_has_logged_out');
-      localStorage.setItem('meditrack_last_logged_out_email', createdUser.contactEmail || '');
-      toast.success(`Workspace created! Welcome to ${createdOrg.name}`);
+      toast.success(`Registration complete! Welcome to ${createdOrg.name}`);
       navigate('/');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to complete workspace registration. Please try again.');
+      toast.error(err.message || 'Failed to complete registration. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -398,7 +387,7 @@ export function AuthPage() {
           <div className="flex items-center gap-2.5 mb-2">
             <Logo className="w-8 h-8" />
             <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              MediTrack
+              MediTrack Pro
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
@@ -407,7 +396,7 @@ export function AuthPage() {
         </div>
 
         {/* ---------------------------------------------------- */}
-        {/* 1. INITIAL AUTHENTICATION SCREEN                    */}
+        {/* PART 1 — INITIAL AUTHENTICATION SCREEN               */}
         {/* ---------------------------------------------------- */}
         {screen === 'initial' && (
           <div className="space-y-3.5">
@@ -438,7 +427,7 @@ export function AuthPage() {
               <span>Continue with Facebook</span>
             </button>
 
-            {/* More Login Methods (Shown after logout or returning users) */}
+            {/* More login methods (ONLY visible for returning/logged-out users) */}
             {hasLoggedOut && (
               <div className="pt-2 text-center">
                 <button
@@ -455,7 +444,7 @@ export function AuthPage() {
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* 2. MORE LOGIN METHODS SCREEN                         */}
+        {/* PART 2 & 7 — MORE LOGIN METHODS (SECONDARY SCREEN)   */}
         {/* ---------------------------------------------------- */}
         {screen === 'more-methods' && (
           <div className="space-y-4">
@@ -489,7 +478,7 @@ export function AuthPage() {
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* 3. EMAIL LOGIN: ENTER EMAIL                         */}
+        {/* PART 4 — EMAIL AUTHENTICATION: ENTER EMAIL           */}
         {/* ---------------------------------------------------- */}
         {screen === 'email-input' && (
           <form onSubmit={handleGetCode} className="space-y-4">
@@ -507,7 +496,7 @@ export function AuthPage() {
                 Please enter your email
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                We'll send a 6-digit code to sign in or register your workspace.
+                We'll send a 6-digit verification code to sign in or register your workspace.
               </p>
             </div>
 
@@ -543,7 +532,7 @@ export function AuthPage() {
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* 4. EMAIL LOGIN: VERIFY 6-DIGIT CODE                 */}
+        {/* PART 5 — EMAIL VERIFICATION: VERIFY 6-DIGIT CODE     */}
         {/* ---------------------------------------------------- */}
         {screen === 'email-verify' && (
           <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -564,34 +553,6 @@ export function AuthPage() {
                 Sent to <strong className="text-slate-800 dark:text-slate-200">{email}</strong>
               </p>
             </div>
-
-            {/* Verification Code Box with Auto-Fill */}
-            {sentCode && (
-              <div className="p-3.5 rounded-xl bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800/60 text-left space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-primary-900 dark:text-primary-200">
-                    <ShieldCheck className="w-4 h-4 text-primary-600" />
-                    <span className="text-xs font-bold">Verification Code</span>
-                  </div>
-                  <span className="font-mono text-base font-extrabold tracking-widest bg-white dark:bg-slate-900 px-3 py-1 rounded-lg border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-primary-400 shadow-2xs">
-                    {sentCode}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 pt-0.5">
-                  <span>Enter the code below:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVerificationCode(sentCode);
-                      toast.success(`Code ${sentCode} auto-filled!`);
-                    }}
-                    className="font-bold text-primary-600 hover:text-primary-700 dark:text-primary-400 underline cursor-pointer"
-                  >
-                    Auto-Fill Code
-                  </button>
-                </div>
-              </div>
-            )}
 
             <div className="space-y-1.5 text-left">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -636,7 +597,7 @@ export function AuthPage() {
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* 5. ONBOARDING FLOW (STEPS 1 TO 5)                    */}
+        {/* PART 6 — 5-STEP ONBOARDING FLOW                      */}
         {/* ---------------------------------------------------- */}
         {screen === 'onboarding' && (
           <div className="space-y-5">
@@ -684,7 +645,7 @@ export function AuthPage() {
                     What is your nationality?
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Select your nationality to configure regional phone dialing and regulatory defaults.
+                    Select your nationality to configure your country calling code.
                   </p>
                 </div>
 
@@ -782,7 +743,7 @@ export function AuthPage() {
               </div>
             )}
 
-            {/* STEP 3: PHONE NUMBER (AUTOMATIC COUNTRY CALLING CODE) */}
+            {/* STEP 3: PHONE NUMBER (AUTOMATIC COUNTRY CODE) */}
             {currentStep === 3 && (
               <div className="space-y-4 text-left">
                 <div>
@@ -790,7 +751,7 @@ export function AuthPage() {
                     What is your phone number?
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Your country calling code ({dialCode}) has been automatically determined based on your selected nationality ({selectedNationality}).
+                    Country code <strong className="text-primary-600 dark:text-primary-400">{dialCode}</strong> is automatically assigned from your nationality ({selectedNationality}).
                   </p>
                 </div>
 
@@ -834,7 +795,7 @@ export function AuthPage() {
                     What is your full name?
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Your official name as the pharmacy owner/practitioner.
+                    Your official practitioner or pharmacy owner name.
                   </p>
                 </div>
 
@@ -876,7 +837,7 @@ export function AuthPage() {
                     Add your profile picture
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Upload an avatar or take a photo for your staff badge. You can also skip this step.
+                    Upload an avatar or take a photo. You can also skip this step.
                   </p>
                 </div>
 
@@ -957,23 +918,36 @@ export function AuthPage() {
                   </div>
                 )}
 
-                <Button
-                  type="button"
-                  onClick={handleCompleteOnboarding}
-                  disabled={isSubmitting}
-                  className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Entering Workspace...
-                    </span>
-                  ) : (
-                    <>
-                      <span>Enter Workspace</span>
-                      <ArrowRight className="w-4 h-4 ml-1.5" />
-                    </>
+                <div className="space-y-2 pt-1">
+                  <Button
+                    type="button"
+                    onClick={handleCompleteOnboarding}
+                    disabled={isSubmitting}
+                    className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Entering Workspace...
+                      </span>
+                    ) : (
+                      <>
+                        <span>Enter Workspace</span>
+                        <ArrowRight className="w-4 h-4 ml-1.5" />
+                      </>
+                    )}
+                  </Button>
+
+                  {!profilePicture && (
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleCompleteOnboarding}
+                      className="w-full py-1 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-center cursor-pointer"
+                    >
+                      Skip profile picture for now
+                    </button>
                   )}
-                </Button>
+                </div>
               </div>
             )}
 
@@ -983,7 +957,7 @@ export function AuthPage() {
       </div>
 
       {/* ---------------------------------------------------- */}
-      {/* SOCIAL ACCOUNT PROMPT MODAL (GOOGLE & FACEBOOK)      */}
+      {/* SOCIAL ACCOUNT MODAL (GOOGLE & FACEBOOK AUTHENTICATION) */}
       {/* ---------------------------------------------------- */}
       {activeSocialProvider && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -1017,10 +991,10 @@ export function AuthPage() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Enter your {activeSocialProvider === 'google' ? 'Google' : 'Facebook'} account email to sign in or register:
+              Sign in with your {activeSocialProvider === 'google' ? 'Google' : 'Facebook'} account:
             </p>
 
-            <form onSubmit={handleSocialFormSubmit} className="space-y-3.5 text-left">
+            <form onSubmit={handleSocialFormSubmit} className="space-y-3 text-left">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Email Address <span className="text-red-500">*</span>

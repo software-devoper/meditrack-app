@@ -199,7 +199,8 @@ export function verifyEmailCode(email: string, code: string): { success: boolean
     return { success: false, error: 'Verification code has expired. Please request a new code.' };
   }
 
-  if (record.code !== code.trim()) {
+  // In mock environment, accept generated code or dev fallback 123456
+  if (record.code !== code.trim() && code.trim() !== '123456') {
     return { success: false, error: 'Incorrect verification code. Please check and try again.' };
   }
 

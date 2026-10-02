@@ -1,4 +1,5 @@
 # ARCHITECTURE.md — MediTrack Pro Technical Specification
+<!-- Last verified: 2026-10-02 against actual codebase -->
 
 ## 1. System Architecture
 
@@ -20,11 +21,24 @@ React 19 Single Page Application (Vite + Tailwind CSS v4)
       │
       ├── Data & Auth Logic Layer (authService.ts, emailValidation.ts)
       │
-      └── Database Access Layer (firebase.ts / firebase-mock.ts)
+      └── SOLE Database Layer: firebase-mock.ts (LocalStorage-backed MockDatabaseEmitter)
             │
-            ├── Primary: Cloud Firestore (Remote NoSQL Database)
-            └── Fallback: Reactive LocalStorage Engine (MockDatabaseEmitter)
+            NOTE: vite.config.ts aliases firebase/app, firebase/auth, firebase/firestore
+            to firebase-mock.ts. Real Firestore and Firebase Auth are NEVER called.
 ```
+
+### CRITICAL: Mock-Only Database Architecture
+
+All Firebase SDK imports resolve to `src/lib/firebase-mock.ts` via Vite module aliases:
+```ts
+// vite.config.ts resolve.alias:
+'firebase/app'       → src/lib/firebase-mock.ts
+'firebase/auth'      → src/lib/firebase-mock.ts
+'firebase/firestore' → src/lib/firebase-mock.ts
+```
+`src/lib/firebase.ts` initializes SDK objects with `isFirebaseConfigured = true` (hardcoded)
+but those objects are never reached at runtime due to the alias interception.
+`authService.ts` calls `getCollectionData()`/`saveCollectionData()` from `firebase-mock.ts` directly.
 
 ---
 
@@ -32,21 +46,31 @@ React 19 Single Page Application (Vite + Tailwind CSS v4)
 
 ```text
 /
-├── .env.example                # Environment variables template
-├── firestore.rules             # Production Firestore security rules
+├── .env.example                # Firebase env var template (not read at runtime due to mock aliases)
+├── firestore.rules             # Firestore security rules (reference only; mock engine used)
+├── DRAFT_firestore.rules       # Draft/alternate Firestore security rules
 ├── firebase-blueprint.json     # Declarative Firestore schema specification
+├── security_spec.md            # Security specification document
 ├── package.json                # Project dependencies and npm scripts
+├── tsconfig.json               # TypeScript compiler configuration
 ├── vercel.json                 # Vercel SPA route rewrite rules
-├── vite.config.ts              # Vite bundler & Tailwind CSS plugin setup
+├── vite.config.ts              # CRITICAL: Firebase mock aliases + Tailwind CSS + versionPlugin
+├── public/
+│   └── version.json            # Written by versionPlugin() at build time (PWA update)
 └── src/
     ├── main.tsx                # Entry point mounting App to DOM
     ├── App.tsx                 # Root component, theme applicator & router
     ├── index.css               # Global styles, dynamic font variables, CSS imports
-    ├── assets/                 # Brand logos and payment QR images
+    ├── assets/
+    │   ├── images/             # Image assets subdirectory
+    │   ├── phonepe-qr.png      # PhonePe QR code image
+    │   └── phonepeQrData.ts    # PhonePe UPI QR payment data
     ├── components/
     │   ├── Logo.tsx            # SVG Brand logo
-    │   ├── UpdateNotificationCard.tsx # App update banner
-    │   ├── doctor/             # 3D Doctor gesture & state machine components
+    │   ├── PharmacyWelcomeAnimation.css  # Welcome animation styles
+    │   ├── PharmacyWelcomeAnimation.jsx  # Welcome animation component
+    │   ├── UpdateNotificationCard.tsx    # App update banner (reads public/version.json)
+    │   ├── doctor/             # 8 files: 3D Doctor gesture & state machine components
     │   ├── layout/
     │   │   ├── Layout.tsx      # Application layout wrapper
     │   │   └── WorkspaceSwitcher.tsx # Multi-tenant organization switcher modal
@@ -61,29 +85,36 @@ React 19 Single Page Application (Vite + Tailwind CSS v4)
     ├── context/
     │   └── AlertModalContext.tsx # Global modal alert/confirm provider
     ├── features/
-    │   ├── auth/               # AuthPage, Login, Bootstrap, authService, countries
-    │   ├── dashboard/          # Analytics & executive metrics view
-    │   ├── doctors/            # Prescribing doctor directory
-    │   ├── customers/          # Patient directory redirects
-    │   ├── patients/           # Patient & Customer management
-    │   ├── profile/            # Profile editor, photo upload & webcam capture
-    │   ├── purchase/           # Inventory stock entry & supplier bill logging
-    │   ├── sales/              # POS terminal, billing, invoice printing & history
-    │   ├── settings/           # UI settings & organization workspace details
-    │   ├── suppliers/          # Vendor directory & accounts payable
-    │   └── legal/              # Privacy Policy & Data Deletion legal documentation
+    │   ├── auth/               # AuthPage.tsx, Login.tsx, Bootstrap.tsx, authService.ts, countries.ts
+    │   ├── customers/          # Customers.tsx (redirects to /patients)
+    │   ├── dashboard/          # Dashboard.tsx (single file ~31KB)
+    │   ├── doctors/            # Doctors.tsx (single file ~17KB)
+    │   ├── legal/              # PrivacyPolicy.tsx (serves /privacy and /data-deletion)
+    │   ├── patients/           # Patients.tsx (single file ~74KB)
+    │   ├── profile/            # Profile.tsx (single file ~25KB)
+    │   ├── purchase/           # Purchase.tsx, ProductsTab.tsx, HistoryTab.tsx,
+    │   │                       # ProductFormModal.tsx, ProductValuesModal.tsx,
+    │   │                       # SupplierSuggestionInput.tsx, ProductSuggestionInput.tsx
+    │   ├── sales/              # Sales.tsx, NewSaleTab.tsx (~89KB), SalesHistoryTab.tsx,
+    │   │                       # EditSaleModal.tsx, PatientDoctorSelectModal.tsx,
+    │   │                       # NewCustomerDoctorModal.tsx, ProductAutocomplete.tsx,
+    │   │                       # CustomerAutocomplete.tsx, DoctorAutocomplete.tsx,
+    │   │                       # InvoicePrintTemplate.tsx
+    │   ├── settings/           # Settings.tsx (single file ~41KB)
+    │   ├── suppliers/          # Suppliers.tsx (single file ~60KB)
+    │   └── legal/              # PrivacyPolicy.tsx
     ├── hooks/
-    │   └── useAppUpdate.ts     # PWA update detection hook
+    │   └── useAppUpdate.ts     # PWA update detection hook (reads /version.json)
     ├── lib/
-    │   ├── firebase.ts         # Firebase App, Auth & Firestore initialization
-    │   ├── firebase-mock.ts    # Fallback reactive local database engine
+    │   ├── firebase.ts         # Firebase SDK init (aliased at build; db/auth unused in practice)
+    │   ├── firebase-mock.ts    # PRIMARY DB ENGINE: localStorage + MockDatabaseEmitter
     │   ├── emailValidation.ts  # Email syntax validator & 6-digit OTP engine
     │   ├── firestore-errors.ts # Firestore error boundary handler
     │   ├── currencyWords.ts    # Rupee amount-to-words generator for invoices
     │   └── utils.ts            # Class merge helper (clsx + tailwind-merge)
     ├── store/
-    │   ├── useAuthStore.ts     # Auth session & workspace store
-    │   └── useSettingsStore.ts # UI appearance & theme store
+    │   ├── useAuthStore.ts     # Auth session & workspace store (key: meditrack-auth-storage)
+    │   └── useSettingsStore.ts # UI appearance & theme store (key: meditrack-settings)
     └── types/
         ├── index.ts            # TypeScript interfaces
         └── vite-env.d.ts       # Vite env types
@@ -107,13 +138,14 @@ React 19 Single Page Application (Vite + Tailwind CSS v4)
 
 ## 4. Authentication Architecture
 
-* **Authentication Paradigm**: Passwordless 6-Digit Email OTP + Google/Facebook Social Auth.
+* **Authentication Paradigm**: Mock-based — all auth operations resolved against `firebase-mock.ts` localStorage engine. No real Firebase Auth SDK calls are made.
 * **Session Lifecycle**:
   ```text
   User Accesses Application
              │
              ▼
-  App.tsx Listens via onAuthStateChanged (Firebase Auth) & useAuthStore
+  App.tsx onAuthStateChanged fires (aliased to mock, effectively no-op)
+  useAuthStore.isAuthenticated checked (from localStorage)
              │
       ┌──────┴────────────────────────┐
       ▼                               ▼
@@ -121,22 +153,26 @@ React 19 Single Page Application (Vite + Tailwind CSS v4)
       │                               │
       ▼                               ▼
   Loads User & Workspace       Redirects to /login (AuthPage.tsx)
-  from Firestore / LocalStorage
+  from firebase-mock.ts
   ```
+* **Auth Methods (all via firebase-mock.ts)**:
+  1. Email OTP: `sendEmailCode(email)` → 6-digit code in memory → `verifyCode(email, code)` validates
+  2. Social (Google/Facebook): UI prompt for email + name → resolved against mock `users` collection (NOT real OAuth)
+  3. Password-based: `authenticateWithPassword()` → checks `getStoredPasswords()` from mock engine
 * **Auth States in `AuthPage.tsx`**:
-  * `'initial'`: Shows pharmacy intro + Google/Facebook buttons (and "More login methods" if user logged out).
+  * `'initial'`: Shows pharmacy intro + Google/Facebook buttons (and "More login methods" if any prior user).
   * `'more-methods'`: Displays "Continue with Email".
-  * `'email-input'`: Accepts user email address $\rightarrow$ triggers `sendEmailCode(email)`.
-  * `'email-verify'`: Accepts 6-digit OTP code $\rightarrow$ verifies code via `verifyCode(email, code)`.
-    * If email matches registered user $\rightarrow$ Signs in directly to existing workspace (`/`).
-    * If email is unregistered $\rightarrow$ Advances to 5-Step Onboarding Flow.
+  * `'email-input'`: Accepts user email address → triggers `sendEmailCode(email)`.
+  * `'email-verify'`: Accepts 6-digit OTP code → verifies code via `verifyCode(email, code)`.
+    * Registered email → Signs in to existing workspace (`/`).
+    * New email → Advances to 5-Step Onboarding Flow.
   * `'onboarding'`: 5-step registration wizard:
     1. Nationality selection
     2. Pharmacy / Organization Name
     3. Phone Number (with auto-assigned calling code prefix e.g. `+91`)
     4. Full Name
     5. Profile Picture (Upload image file, capture live webcam snapshot, or skip)
-    $\rightarrow$ Saves new `User` & `Organization` records $\rightarrow$ Redirects to workspace (`/`).
+    → Calls `registerWorkspaceUser()` → saves User & Organization to mock → redirects to `/`.
 
 ---
 
@@ -204,16 +240,21 @@ Defined in `src/App.tsx` using `react-router-dom`:
 | Path | Element | Access Guard | Description |
 | :--- | :--- | :--- | :--- |
 | `/login` | `<AuthPage />` | Public | Authentication & onboarding page |
-| `/signup` | `<AuthPage />` | Public | Registration page |
+| `/signup` | `<AuthPage />` | Public | Registration page (same component) |
 | `/auth` | `<AuthPage />` | Public | Authentication page alias |
 | `/setup` | `<Bootstrap />` | Public | System bootstrap utility |
-| `/privacy` | `<PrivacyPolicy />` | Public | Privacy Policy & Data Deletion compliance |
+| `/privacy` | `<PrivacyPolicy />` | Public | Privacy Policy page |
+| `/data-deletion` | `<PrivacyPolicy />` | Public | Data Deletion policy (same component as /privacy) |
 | `/` | `<Layout />` | Protected (`ProtectedRoute`) | Application Shell |
 | `/` (index) | `<Dashboard />` | Protected | Executive dashboard & real-time metrics |
 | `/purchase` | `<Purchase />` | Protected | Inventory stock & purchase orders |
 | `/sales` | `<Sales />` | Protected | POS billing terminal & sales history |
 | `/patients` | `<Patients />` | Protected | Patient records & balance tracking |
+| `/patient-info` | Navigate → `/patients` | Protected | Legacy alias |
 | `/suppliers` | `<Suppliers />` | Protected | Supplier directory & payable tracking |
+| `/supplier-info` | Navigate → `/suppliers` | Protected | Legacy alias |
+| `/customers` | Navigate → `/patients` | Protected | Legacy redirect |
+| `/doctors` | Navigate → `/patients` | Protected | Doctors rendered inside Patients page |
 | `/settings` | `<Settings />` | Protected | UI appearance settings & organization details |
 | `/profile` | `<Profile />` | Protected | User account profile, avatar upload & webcam capture |
 
@@ -253,6 +294,8 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
+**Important**: These environment variables are NOT read at runtime because Vite aliases all Firebase SDK imports to `firebase-mock.ts`. They would only be needed if the Vite mock aliases are removed for a real Firebase migration.
+
 ---
 
 ## 12. Vercel Deployment
@@ -270,6 +313,9 @@ VITE_FIREBASE_APP_ID=
   ```
 * **Build Command**: `npm run build` (`vite build`).
 * **Output Directory**: `dist`.
+* **Dev Server**: `npm run dev` — runs on port 3000 (`vite --port=3000 --host=0.0.0.0`).
+* **Lint/Type Check**: `npm run lint` — runs `tsc --noEmit`.
+* **versionPlugin**: Custom Vite plugin in `vite.config.ts` that writes `public/version.json` at build time. This file is read by `useAppUpdate.ts` hook for PWA update detection.
 
 ---
 
@@ -289,11 +335,15 @@ Future developers and AI agents MUST reuse these components rather than duplicat
 
 ## 14. Security Architecture
 
-* **Firestore Security Rules (`firestore.rules`)**:
-  * Enforces `request.auth != null` for document creation and updates.
-  * Ensures `stockLedger` entries are append-only (`allow update, delete: if false`).
-* **Authentication Safeguards**: Passwordless 6-digit OTP verification preventing brute-force password attacks.
-* **Multi-Tenant Scoping**: All queries filter by `tenantId` to guarantee organizational data isolation.
+* **Firestore Security Rules (`firestore.rules`)** (reference only — not active at runtime):
+  * `metadata`: public read, authenticated write.
+  * `users`: public read, authenticated create/update (own uid or admin), admin-only delete.
+  * `products`, `customers`, `doctors`, `sales`, `purchases`: public read, authenticated create/update/delete.
+  * `stockLedger`: public read, authenticated create, **update/delete blocked** (`allow update, delete: if false`) — immutable ledger.
+  * Default catch-all: `deny all`.
+* **Mock Engine Security**: Data is stored in browser localStorage; no server-side auth enforcement at runtime.
+* **Authentication Design**: Passwordless 6-digit OTP verification. Social login is simulated (no real OAuth tokens).
+* **Multi-Tenant Scoping**: All queries filter by `tenantId` to guarantee organizational data isolation within the mock engine.
 
 ---
 
@@ -312,10 +362,19 @@ The project architecture has been fully analyzed and documented. AI agents MUST 
 
 ### Workflow for Task Execution
 ```text
-1. Consult PROJECT_CONTEXT.md and ARCHITECTURE.md
-2. Locate relevant files in the Feature-to-File Mapping
+1. Read PROJECT_CONTEXT.md and ARCHITECTURE.md
+2. Locate relevant files in the Feature-to-File Mapping (PROJECT_CONTEXT.md Section 8)
 3. Read ONLY those specific files and immediate imports
 4. Make precise, minimal edits fulfilling the requirement
-5. Run compile_applet and lint_applet to verify
-6. Do NOT touch unrelated components, auth flows, or deployment scripts
+5. Run: npm run lint (tsc --noEmit) to verify no type errors
+6. Report which files were changed and why
+7. Update PROJECT_CONTEXT.md and ARCHITECTURE.md if architecture was changed
+8. Do NOT touch unrelated components, auth flows, or deployment scripts
 ```
+
+### Critical Architecture Constraints for AI Agents
+- **Never remove the Vite Firebase mock aliases** in `vite.config.ts` unless explicitly tasked with migrating to real Firebase.
+- **Never add real Firebase Auth SDK calls** (`signInWithPopup`, `signInWithGoogle`, etc.) — they are aliased to the mock.
+- **Never modify the immutable `stockLedger`** — insert-only, no update or delete.
+- **Always scope data queries by `tenantId`** for multi-tenant isolation.
+- **`@google/genai` is installed but unused** — do not assume it is integrated unless verified.
