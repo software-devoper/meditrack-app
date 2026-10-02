@@ -370,7 +370,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Client Pharmacy Workspace Banner */}
+      {/* Pharmacy Overview Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-primary-50 via-teal-50/50 to-white dark:from-primary-950/40 dark:via-slate-850 dark:to-slate-900 border border-primary-100 dark:border-primary-900/40 shadow-2xs">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
@@ -379,14 +379,14 @@ export function Dashboard() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {organization?.name || user?.organizationName || 'MediTrack Cloud Pharmacy'}
+                {organization?.name || user?.organizationName || 'MediTrack Pharmacy'}
               </span>
               <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
                 {organization?.plan || user?.plan || 'Growth'} Plan
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Isolated workspace • {allProducts.length} medicines in inventory • {allSales.length} recorded sales transactions
+              Active pharmacy • {allProducts.length} medicines in inventory • {allSales.length} recorded sales transactions
             </p>
           </div>
         </div>
@@ -397,7 +397,7 @@ export function Dashboard() {
             className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1.5"
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>Workspace Profile & Staff</span>
+            <span>Pharmacy Profile & Settings</span>
           </Link>
         </div>
       </div>

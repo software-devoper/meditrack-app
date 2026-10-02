@@ -154,8 +154,17 @@ export function Layout() {
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 shrink-0">
-              {user.name.charAt(0).toUpperCase()}
+            <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 shrink-0 overflow-hidden border border-primary-200 dark:border-primary-800/60 shadow-2xs">
+              {user.avatarUrl ? (
+                <img 
+                  src={user.avatarUrl} 
+                  alt={user.name} 
+                  className="w-full h-full object-cover" 
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              ) : (
+                <span>{user.name.charAt(0).toUpperCase()}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold truncate text-slate-800 dark:text-slate-200">{user.name}</p>
@@ -262,8 +271,17 @@ export function Layout() {
           {!isCollapsed ? (
             <>
               <div className="flex items-center gap-3 mb-3 px-1">
-                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 shrink-0">
-                  {user.name.charAt(0).toUpperCase()}
+                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 shrink-0 overflow-hidden border border-primary-200 dark:border-primary-800/60 shadow-2xs">
+                  {user.avatarUrl ? (
+                    <img 
+                      src={user.avatarUrl} 
+                      alt={user.name} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span>{user.name.charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold truncate text-slate-800 dark:text-slate-200">{user.name}</p>
@@ -294,10 +312,19 @@ export function Layout() {
           ) : (
             <div className="flex flex-col items-center gap-2">
               <div 
-                className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400"
+                className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 shrink-0 overflow-hidden border border-primary-200 dark:border-primary-800/60 shadow-2xs"
                 title={`${user.name} (${user.role})`}
               >
-                {user.name.charAt(0).toUpperCase()}
+                {user.avatarUrl ? (
+                  <img 
+                    src={user.avatarUrl} 
+                    alt={user.name} 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <span>{user.name.charAt(0).toUpperCase()}</span>
+                )}
               </div>
               <Button 
                 variant="ghost" 
@@ -390,8 +417,17 @@ export function Layout() {
               className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
               title="View Profile"
             >
-              <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 text-xs">
-                {user.name.charAt(0).toUpperCase()}
+              <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center font-bold text-primary-600 dark:text-primary-400 text-xs shrink-0 overflow-hidden border border-primary-200 dark:border-primary-800/60 shadow-2xs">
+                {user.avatarUrl ? (
+                  <img 
+                    src={user.avatarUrl} 
+                    alt={user.name} 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <span>{user.name.charAt(0).toUpperCase()}</span>
+                )}
               </div>
               <span className="hidden sm:inline-block text-xs font-semibold text-slate-700 dark:text-slate-300 max-w-[120px] truncate">
                 {user.name}

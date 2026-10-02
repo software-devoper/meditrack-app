@@ -39,8 +39,7 @@ import {
   getWorkspaceMembers, 
   addWorkspaceMember, 
   deleteWorkspaceMember, 
-  exportActiveTenantData,
-  createClientWorkspace 
+  exportActiveTenantData
 } from '../../lib/firebase-mock';
 import { Organization, User, Role } from '../../types';
 
@@ -88,14 +87,6 @@ export function Settings() {
   const [memberRole, setMemberRole] = useState<Role>('pharmacist');
   const [memberPhone, setMemberPhone] = useState('');
   const [isAddingMember, setIsAddingMember] = useState(false);
-
-  // New Workspace Modal
-  const [isCreateOrgOpen, setIsCreateOrgOpen] = useState(false);
-  const [newOrgName, setNewOrgName] = useState('');
-  const [newOrgPlan, setNewOrgPlan] = useState<'starter' | 'growth' | 'enterprise'>('growth');
-  const [newOrgGst, setNewOrgGst] = useState('');
-  const [newOrgPhone, setNewOrgPhone] = useState('');
-  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
 
   const activeTenantId = organization?.id || user?.tenantId || 'tenant_apex';
 
@@ -220,35 +211,6 @@ export function Settings() {
     }
   };
 
-  const handleCreateWorkspace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newOrgName.trim()) {
-      toast.error('Organization name is required');
-      return;
-    }
-    setIsCreatingOrg(true);
-    try {
-      const created = await createClientWorkspace({
-        name: newOrgName.trim(),
-        plan: newOrgPlan,
-        gstNumber: newOrgGst.trim(),
-        phone: newOrgPhone.trim(),
-        ownerName: user?.name
-      });
-      reloadData();
-      switchWorkspace(created);
-      toast.success(`Created workspace: ${created.name}`);
-      setNewOrgName('');
-      setNewOrgGst('');
-      setNewOrgPhone('');
-      setIsCreateOrgOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create workspace');
-    } finally {
-      setIsCreatingOrg(false);
-    }
-  };
-
   const colors: { id: ColorScheme; label: string; class: string }[] = [
     { id: 'blue', label: 'Blue', class: 'bg-blue-500' },
     { id: 'green', label: 'Green', class: 'bg-green-500' },
@@ -286,7 +248,7 @@ export function Settings() {
             Pharmacy SaaS Settings
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
-            Manage your client workspace profile, staff access control, invoice branding, and layout.
+            Manage your pharmacy profile, staff access control, invoice branding, and layout.
           </p>
         </div>
 
@@ -389,14 +351,6 @@ export function Settings() {
               >
                 <Download className="w-3.5 h-3.5" />
                 Export Workspace (JSON)
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setIsCreateOrgOpen(true)}
-                className="bg-primary-500 hover:bg-primary-600 text-white text-xs gap-1.5 font-bold"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                New Client Pharmacy
               </Button>
             </div>
           </div>
@@ -593,74 +547,39 @@ export function Settings() {
 
             {/* Right Col: Client Workspaces Hub */}
             <div className="space-y-6">
+              {/* Pharmacy Overview Card */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-primary-500" />
-                    All Client Workspaces ({allOrgs.length})
+                    <Building2 className="w-5 h-5 text-primary-500" />
+                    Pharmacy Profile Status
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Switch between different pharmacy branches or client organizations:
-                  </p>
-
-                  <div className="space-y-2 pt-2">
-                    {allOrgs.map((org) => {
-                      const isCurrent = org.id === activeTenantId;
-                      return (
-                        <div
-                          key={org.id}
-                          className={cn(
-                            "p-3 rounded-xl border transition-all",
-                            isCurrent
-                              ? "bg-primary-50 dark:bg-primary-950/40 border-primary-300 dark:border-primary-800 shadow-2xs"
-                              : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                                {org.name}
-                              </p>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                Plan: <span className="font-semibold uppercase text-primary-600 dark:text-primary-400">{org.plan}</span> • {org.branchesCount || 1} br.
-                              </p>
-                            </div>
-                            {isCurrent && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary-600 text-white shrink-0">
-                                Active
-                              </span>
-                            )}
-                          </div>
-
-                          {!isCurrent && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                switchWorkspace(org);
-                                reloadData();
-                                toast.success(`Switched to workspace: ${org.name}`);
-                              }}
-                              className="mt-2.5 w-full text-xs font-semibold h-8"
-                            >
-                              Switch to this Pharmacy
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
+                <CardContent className="space-y-3">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Current Pharmacy</span>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">
+                        {orgName || organization?.name || 'Pharmacy Workspace'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Status</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">SaaS Plan</span>
+                      <span className="text-xs font-extrabold uppercase text-primary-600 dark:text-primary-400">
+                        {organization?.plan || user?.plan || 'Growth'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Staff Count</span>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{members.length} Members</span>
+                    </div>
                   </div>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsCreateOrgOpen(true)}
-                    className="w-full mt-4 text-xs font-bold gap-2 text-primary-600 border-dashed border-primary-300 dark:border-primary-800 h-9"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Register Another Client
-                  </Button>
                 </CardContent>
               </Card>
 
@@ -987,90 +906,6 @@ export function Settings() {
                 </Button>
                 <Button type="submit" disabled={isAddingMember} className="bg-primary-600 text-white font-bold">
                   {isAddingMember ? 'Adding...' : 'Create Account'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: CREATE WORKSPACE */}
-      {isCreateOrgOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-700 shadow-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary-500" />
-                Register New Client Pharmacy
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCreateOrgOpen(false)}
-                className="h-8 w-8 text-slate-400"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <form onSubmit={handleCreateWorkspace} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Pharmacy / Clinic Name <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  required
-                  placeholder="e.g. CityCare Pharmacy"
-                  value={newOrgName}
-                  onChange={(e) => setNewOrgName(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    SaaS Plan
-                  </label>
-                  <select
-                    value={newOrgPlan}
-                    onChange={(e: any) => setNewOrgPlan(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                  >
-                    <option value="starter">Starter</option>
-                    <option value="growth">Growth</option>
-                    <option value="enterprise">Enterprise</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Phone
-                  </label>
-                  <Input
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    value={newOrgPhone}
-                    onChange={(e) => setNewOrgPhone(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  GSTIN / Tax ID (Optional)
-                </label>
-                <Input
-                  placeholder="27AAAAA0000A1Z5"
-                  value={newOrgGst}
-                  onChange={(e) => setNewOrgGst(e.target.value)}
-                />
-              </div>
-
-              <div className="pt-3 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateOrgOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isCreatingOrg} className="bg-primary-600 text-white font-bold">
-                  {isCreatingOrg ? 'Creating...' : 'Register Workspace'}
                 </Button>
               </div>
             </form>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -7,7 +7,21 @@ import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 
 import { auth, db } from "../../lib/firebase";
 import { useAuthStore } from "../../store/useAuthStore";
 import { Card, CardContent, CardHeader, CardTitle, Button, Input } from "../../components/ui";
-import { UserCircle, Lock, Mail, ShieldCheck, User, AlertTriangle, Trash2, Eye, EyeOff, KeyRound } from "lucide-react";
+import { 
+  UserCircle, 
+  Lock, 
+  Mail, 
+  ShieldCheck, 
+  User, 
+  AlertTriangle, 
+  Trash2, 
+  Eye, 
+  EyeOff, 
+  KeyRound,
+  Camera,
+  Upload,
+  X
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAlertModal } from "../../context/AlertModalContext";
 
@@ -40,6 +54,105 @@ export function Profile() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Avatar and camera state
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const handleStartCamera = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.info("Camera not supported on this browser. Please select an image file.");
+        fileInputRef.current?.click();
+        return;
+      }
+      setIsCameraActive(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user', width: { ideal: 400 }, height: { ideal: 400 } } 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.warn("Camera access failed", err);
+      toast.error("Camera access failed. Please upload a photo instead.");
+      setIsCameraActive(false);
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleCapturePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 320;
+    canvas.height = video.videoHeight || 320;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      handleUpdateAvatar(dataUrl);
+    }
+    stopCamera();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload a valid image file (JPG, PNG, WebP)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        handleUpdateAvatar(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleUpdateAvatar = async (avatarDataUrl: string) => {
+    if (!user) return;
+    try {
+      if (db && user.id) {
+        try {
+          await updateDoc(doc(db, "users", user.id), { avatarUrl: avatarDataUrl });
+        } catch (e) {
+          console.warn("Could not updateDoc for user avatar:", e);
+        }
+      }
+      setUser({ ...user, avatarUrl: avatarDataUrl });
+      toast.success(avatarDataUrl ? "Profile picture updated successfully!" : "Profile picture removed");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update profile picture");
+    }
+  };
 
   // Setup Profile Form
   const {
@@ -166,15 +279,125 @@ export function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="bg-primary-600/10 p-3 rounded-full text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
-          <UserCircle className="w-8 h-8" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Account Profile</h2>
-          <p className="text-slate-500 dark:text-slate-400">Manage your personal information and security settings.</p>
-        </div>
-      </div>
+      {/* Profile Header & Avatar Card */}
+      <Card className="shadow-sm overflow-hidden border-slate-200 dark:border-slate-800">
+        <div className="h-20 bg-gradient-to-r from-primary-600 via-teal-600 to-primary-700" />
+        <CardContent className="pt-0 pb-6 px-6 -mt-10">
+          <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="relative group">
+                <div className="w-20 h-20 rounded-full border-4 border-white dark:border-slate-900 bg-primary-100 dark:bg-primary-900/60 overflow-hidden shadow-md flex items-center justify-center font-bold text-2xl text-primary-600 dark:text-primary-300">
+                  {user.avatarUrl ? (
+                    <img 
+                      src={user.avatarUrl} 
+                      alt={user.name} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span>{user.name.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload profile picture"
+                  className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary-600 hover:bg-primary-700 text-white shadow-md transition-transform hover:scale-105 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center justify-center sm:justify-start gap-2">
+                  <span>{user.name}</span>
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-900/60 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800">
+                    {user.role}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  @{user.username} • {user.contactEmail || user.internalAuthEmail || 'No email set'}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  {user.organizationName || 'MediTrack Pharmacy'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept="image/*"
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8 text-xs font-semibold gap-1.5"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Upload Photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleStartCamera}
+                className="h-8 text-xs font-semibold gap-1.5"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Webcam
+              </Button>
+              {user.avatarUrl && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUpdateAvatar('')}
+                  className="h-8 text-xs font-semibold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Webcam Live Capture Viewfinder */}
+          {isCameraActive && (
+            <div className="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className="w-full max-w-sm mx-auto h-48 object-cover rounded-lg bg-black"
+              />
+              <div className="flex items-center justify-center gap-2">
+                <Button 
+                  type="button" 
+                  onClick={handleCapturePhoto} 
+                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                >
+                  <Camera className="w-3.5 h-3.5 mr-1.5" /> Capture & Save
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={stopCamera} 
+                  className="h-8 text-xs"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Personal Information Card */}
