@@ -56,11 +56,6 @@ export function AuthPage() {
   const [screen, setScreen] = useState<ScreenState>('initial');
   const [hasLoggedOut, setHasLoggedOut] = useState(false);
 
-  // Sign-in with password state
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
   // Email authentication state (code verification)
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -114,9 +109,9 @@ export function AuthPage() {
       setHasLoggedOut(true);
       setAuthTab('signin'); // When logged out, ALWAYS show sign-in, never registration!
       if (lastEmail) {
-        setLoginIdentifier(lastEmail);
+        setEmail(lastEmail);
       } else if (users.length > 0 && users[0].contactEmail) {
-        setLoginIdentifier(users[0].contactEmail);
+        setEmail(users[0].contactEmail);
       }
     } else {
       // First time fresh visitor with 0 users: show register tab
@@ -240,29 +235,50 @@ export function AuthPage() {
     }
   };
 
-  // Password-based sign in
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  // Request 6-digit email code from Sign In page
+  const handleGetSignInCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = loginIdentifier.trim();
-    if (!cleanId) {
-      toast.error('Please enter your email or username');
-      return;
-    }
-    if (!loginPassword) {
-      toast.error('Please enter your password');
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      toast.error('Please enter a valid email address (e.g. doctor@pharmacy.com)');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { user: authUser, organization: org } = await authenticateWithPassword(cleanId, loginPassword);
-      setUser(authUser, authUser.id, org);
-      localStorage.removeItem('meditrack_has_logged_out');
-      localStorage.setItem('meditrack_last_logged_out_email', authUser.contactEmail || '');
-      toast.success(`Welcome back, ${authUser.name}! Entered ${org.name}`);
-      navigate('/');
+      const existingUser = await findUserByEmail(cleanEmail);
+
+      if (existingUser && existingUser.registrationCompleted !== false) {
+        // User IS REGISTERED -> send 6-digit code for sign in
+        const code = sendEmailCode(cleanEmail);
+        setSentCode(code);
+        setResendTimer(60);
+        setVerificationCode('');
+        setScreen('email-verify');
+
+        toast.success(`Verification code generated: ${code}`, {
+          duration: 15000,
+          description: `6-digit security code sent to ${cleanEmail}. Click Auto-Fill to apply.`
+        });
+      } else {
+        // User is UNREGISTERED -> Notify and redirect to sign up flow
+        toast.info("No existing workspace found with this email. Redirecting you to set up your pharmacy workspace...", {
+          duration: 6000,
+          description: "Let's set up your clinic, stock records, and billing in under 2 minutes."
+        });
+
+        setOnboardingProvider('email');
+        setOnboardingEmail(cleanEmail);
+
+        // Also generate code so user can verify and proceed with onboarding immediately
+        const code = sendEmailCode(cleanEmail);
+        setSentCode(code);
+        setResendTimer(60);
+        setVerificationCode('');
+        setScreen('email-verify');
+      }
     } catch (err: any) {
-      toast.error(err.message || 'Invalid credentials. Please verify your email/username and password.');
+      toast.error(err.message || 'Failed to process request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -518,100 +534,83 @@ export function AuthPage() {
               </div>
             )}
 
-            {/* Password Login Form */}
-            <form onSubmit={handlePasswordLogin} className="space-y-3 text-left">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Email or Username
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    type="text"
-                    required
-                    placeholder="doctor@pharmacy.com or username"
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    className="h-10 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="h-10 pl-10 pr-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full h-10 text-xs font-bold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all mt-1"
+            {/* Social Sign-In Buttons */}
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => handleSocialClick('google')}
+                className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
               >
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Signing In...
-                  </span>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.28-2.09 3.66-5.17 3.66-9.14z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.04c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.13C3.26 21.43 7.31 24 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.59H1.24C.45 8.16 0 9.99 0 12s.45 3.84 1.24 5.41l4.04-3.13z"/>
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.57 1.24 6.59l4.04 3.13c.95-2.83 3.6-4.97 6.72-4.97z"/>
+                </svg>
+                <span>Continue with Google</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSocialClick('facebook')}
+                className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#1877F2">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+                <span>Continue with Facebook</span>
+              </button>
+            </div>
 
             <div className="relative py-1">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200 dark:border-slate-800" />
               </div>
               <div className="relative flex justify-center text-[11px]">
-                <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">or continue with</span>
+                <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">or sign in with email code</span>
               </div>
             </div>
 
-            {/* Social Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleSocialClick('google')}
-                className="h-10 px-3 flex items-center justify-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs"
-              >
-                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.28-2.09 3.66-5.17 3.66-9.14z"/>
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.04c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.13C3.26 21.43 7.31 24 12 24z"/>
-                  <path fill="#FBBC05" d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.59H1.24C.45 8.16 0 9.99 0 12s.45 3.84 1.24 5.41l4.04-3.13z"/>
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.57 1.24 6.59l4.04 3.13c.95-2.83 3.6-4.97 6.72-4.97z"/>
-                </svg>
-                <span>Google</span>
-              </button>
+            {/* Email OTP Code Sign In Form */}
+            <form onSubmit={handleGetSignInCode} className="space-y-3 text-left">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Registered Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="email"
+                    required
+                    placeholder="doctor@pharmacy.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-11 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Enter your email to receive a 6-digit verification code. If your email is not registered yet, you'll be redirected to register.
+                </p>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleSocialClick('facebook')}
-                className="h-10 px-3 flex items-center justify-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all shadow-2xs"
+              <Button
+                type="submit"
+                disabled={isSubmitting || !email.trim()}
+                className="w-full h-11 text-xs font-bold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="#1877F2">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-                <span>Facebook</span>
-              </button>
-            </div>
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking & Sending Code...
+                  </span>
+                ) : (
+                  <>
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Get Code</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </Button>
+            </form>
 
           </div>
         )}
@@ -798,14 +797,14 @@ export function AuthPage() {
             <Button
               type="submit"
               disabled={isVerifying || verificationCode.trim().length !== 6}
-              className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all"
+              className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer"
             >
               {isVerifying ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" /> Verifying Code...
                 </span>
               ) : (
-                'Verify & Proceed'
+                'Continue'
               )}
             </Button>
 
