@@ -1,18 +1,20 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { numberToWords } from '../../lib/currencyWords';
-import { phonepeQrBase64 } from '../../assets/phonepeQrData';
-import phonepeQrImg from '../../assets/phonepe-qr.png';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export function InvoicePrintTemplate({ sale }: { sale: any }) {
-  const { organization, user } = useAuthStore.getState();
+  const { organization, user } = useAuthStore();
   const pharmacyName = organization?.name || user?.organizationName || 'HEALTHBUDDY CHAULKHOLA PHARMACY';
   const proprietorName = organization?.ownerName || user?.name || 'SK SABBIR AHAMMED';
   const pharmacyEmail = organization?.email || user?.contactEmail || 'hbchaulkholapharmacy@gmail.com';
   const pharmacyPhone = organization?.phone || user?.phone || '8420023578';
   const pharmacyGst = organization?.gstNumber || '19DRSPS0161Q1ZR';
   const pharmacyPan = organization?.panNumber || (pharmacyGst.length >= 12 ? pharmacyGst.slice(2, 12) : 'DRSPS0161Q');
+  const pharmacyDrugLicense = organization?.drugLicenseNumber || 'DL-20B/21B-98765';
+  const bankName = organization?.bankName?.trim() || 'STATE BANK OF INDIA';
+  const accountNumber = organization?.accountNumber?.trim() || '38920192847';
+  const ifscCode = organization?.ifscCode?.trim() || 'SBIN0001234';
 
   const rawDocName = typeof sale?.doctorName === 'string' ? sale.doctorName.trim() : '';
   const isDoctorSkipped = !rawDocName || rawDocName.toUpperCase() === 'N/A' || rawDocName.toLowerCase() === 'self';
@@ -40,8 +42,6 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
     : (finalAmount - (totalMrp - totalDisc - billDiscount));
   const rawWords = numberToWords(finalAmount);
   const wordsDisplay = rawWords.endsWith('Rupees Only') ? rawWords : `${rawWords} Rupees Only`;
-
-  const qrSrc = phonepeQrBase64 || phonepeQrImg;
 
   return (
     <div 
@@ -152,13 +152,13 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           width: '100%',
         }}
       >
-        {/* Column 1 (Left, 36% width) */}
+        {/* Column 1 (Left, 35% width) - Patient & Prescriber Doctor Details */}
         <div 
           style={{
-            width: '36%',
-            minWidth: '36%',
-            maxWidth: '36%',
-            flex: '0 0 36%',
+            width: '35%',
+            minWidth: '35%',
+            maxWidth: '35%',
+            flex: '0 0 35%',
             borderRight: '1px solid #000000',
             padding: '3px 5px',
             display: 'flex',
@@ -211,13 +211,13 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           </div>
         </div>
 
-        {/* Column 2 (Middle, 44% width) */}
+        {/* Column 2 (Middle, 42% width) - Pharmacy Legal Profile */}
         <div 
           style={{
-            width: '44%',
-            minWidth: '44%',
-            maxWidth: '44%',
-            flex: '0 0 44%',
+            width: '42%',
+            minWidth: '42%',
+            maxWidth: '42%',
+            flex: '0 0 42%',
             borderRight: '1px solid #000000',
             padding: '2px 6px',
             display: 'flex',
@@ -232,7 +232,7 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           </div>
           <div style={{ borderTop: '1px solid rgba(0,0,0,0.3)', paddingTop: '1px' }}>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
-              <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>PROPRIETER NAME</strong>
+              <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>PROPRIETOR NAME</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
               <span style={{ fontWeight: 600, color: '#000000' }}>{proprietorName}</span>
             </div>
@@ -249,6 +249,11 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
               <span style={{ fontWeight: 500, color: '#000000' }}>{pharmacyPhone}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
+              <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>D.L. Number</strong>
+              <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
+              <span style={{ fontWeight: 600, color: '#000000' }}>{pharmacyDrugLicense}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'row', padding: '1px 0', borderBottom: '1px solid rgba(0,0,0,0.15)' }}>
               <strong style={{ width: '85px', flexShrink: 0, fontWeight: 'bold', color: '#000000' }}>PAN Number</strong>
               <span style={{ marginRight: '4px', fontWeight: 'bold' }}>:</span>
               <span style={{ fontWeight: 500, color: '#000000' }}>{pharmacyPan}</span>
@@ -261,41 +266,63 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           </div>
         </div>
 
-        {/* Column 3 (Right, 20% width) - Compact QR code */}
+        {/* Column 3 (Right, 23% width) - Pharmacy Owner Bank Details */}
         <div 
           style={{
-            width: '20%',
-            minWidth: '20%',
-            maxWidth: '20%',
-            flex: '0 0 20%',
-            padding: '2px 4px',
+            width: '23%',
+            minWidth: '23%',
+            maxWidth: '23%',
+            flex: '0 0 23%',
+            padding: '3px 6px',
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
             justifyContent: 'center',
-            textAlign: 'center',
+            fontSize: '7.8px',
+            lineHeight: 1.25,
             boxSizing: 'border-box',
+            backgroundColor: '#ffffff',
           }}
         >
-          <img 
-            src={qrSrc} 
-            alt="PhonePe QR Code"
-            width={46}
-            height={46}
-            style={{
-              width: '46px',
-              height: '46px',
-              maxWidth: '46px',
-              maxHeight: '46px',
-              objectFit: 'contain',
-              display: 'block',
-              margin: '0 auto 2px auto',
-            }} 
-          />
-          <div style={{ textAlign: 'center', fontSize: '7.6px', lineHeight: 1.15 }}>
-            <div style={{ fontWeight: 'bold', fontSize: '7.6px' }}>Scan & Pay via PhonePe</div>
-            <div><strong>UPI:</strong> sabbirkol@axl</div>
-            <div><strong>Phone Pay No:</strong> 9748470203</div>
+          <div 
+            style={{ 
+              fontSize: '8.8px', 
+              fontWeight: 'bold', 
+              textAlign: 'center', 
+              letterSpacing: '0.4px', 
+              textTransform: 'uppercase', 
+              borderBottom: '1px solid #000000', 
+              paddingBottom: '2px', 
+              marginBottom: '4px',
+              color: '#000000',
+            }}
+          >
+            BANK DETAILS
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '7.2px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000' }}>
+                Bank Name:
+              </span>
+              <span style={{ fontWeight: 600, fontSize: '8px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {bankName}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '7.2px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000' }}>
+                Account No:
+              </span>
+              <span style={{ fontWeight: 'bold', fontSize: '8.4px', letterSpacing: '0.3px', color: '#000000' }}>
+                {accountNumber}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '7.2px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000' }}>
+                IFSC Code:
+              </span>
+              <span style={{ fontWeight: 'bold', fontSize: '8.4px', textTransform: 'uppercase', letterSpacing: '0.3px', color: '#000000' }}>
+                {ifscCode}
+              </span>
+            </div>
           </div>
         </div>
       </div>

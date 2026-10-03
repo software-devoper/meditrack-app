@@ -12,6 +12,7 @@ import {
   CheckCircle2, 
   RotateCcw, 
   Building2, 
+  Landmark,
   Users, 
   Plus, 
   Trash2, 
@@ -68,6 +69,9 @@ export function Settings() {
   const [orgGst, setOrgGst] = useState(organization?.gstNumber || '');
   const [orgPan, setOrgPan] = useState(organization?.panNumber || '');
   const [orgDrugLicense, setOrgDrugLicense] = useState(organization?.drugLicenseNumber || '');
+  const [orgBankName, setOrgBankName] = useState(organization?.bankName || '');
+  const [orgAccountNumber, setOrgAccountNumber] = useState(organization?.accountNumber || '');
+  const [orgIfscCode, setOrgIfscCode] = useState(organization?.ifscCode || '');
   const [orgPhone, setOrgPhone] = useState(organization?.phone || user?.phone || '');
   const [orgEmail, setOrgEmail] = useState(organization?.email || user?.contactEmail || '');
   const [orgAddress, setOrgAddress] = useState(organization?.address || '');
@@ -112,6 +116,9 @@ export function Settings() {
       setOrgGst(organization.gstNumber || '');
       setOrgPan(organization.panNumber || '');
       setOrgDrugLicense(organization.drugLicenseNumber || '');
+      setOrgBankName(organization.bankName || '');
+      setOrgAccountNumber(organization.accountNumber || '');
+      setOrgIfscCode(organization.ifscCode || '');
       setOrgPhone(organization.phone || '');
       setOrgEmail(organization.email || '');
       setOrgAddress(organization.address || '');
@@ -133,6 +140,9 @@ export function Settings() {
         gstNumber: orgGst.trim(),
         panNumber: orgPan.trim(),
         drugLicenseNumber: orgDrugLicense.trim(),
+        bankName: orgBankName.trim(),
+        accountNumber: orgAccountNumber.trim(),
+        ifscCode: orgIfscCode.trim(),
         phone: orgPhone.trim(),
         email: orgEmail.trim(),
         address: orgAddress.trim(),
@@ -468,6 +478,58 @@ export function Settings() {
                       />
                     </div>
 
+                    {/* Pharmacy Owner Bank Details for Invoices */}
+                    <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="w-4 h-4 text-primary-500" />
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                            Pharmacy Owner Bank Details (Printed on Invoices)
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            These bank credentials appear on the sales invoice for RTGS / NEFT / IMPS transfers.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                            Bank Name
+                          </label>
+                          <Input
+                            type="text"
+                            value={orgBankName}
+                            onChange={(e) => setOrgBankName(e.target.value)}
+                            placeholder="e.g. State Bank of India"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                            Account Number (A/C No.)
+                          </label>
+                          <Input
+                            type="text"
+                            value={orgAccountNumber}
+                            onChange={(e) => setOrgAccountNumber(e.target.value)}
+                            placeholder="e.g. 38920192847"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                            IFSC Code
+                          </label>
+                          <Input
+                            type="text"
+                            value={orgIfscCode}
+                            onChange={(e) => setOrgIfscCode(e.target.value.toUpperCase())}
+                            placeholder="e.g. SBIN0001234"
+                            className="uppercase"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="pt-2 flex justify-end">
                       <Button
                         type="submit"
@@ -578,6 +640,18 @@ export function Settings() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Staff Count</span>
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{members.length} Members</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">D.L. Number</span>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">
+                        {orgDrugLicense || organization?.drugLicenseNumber || 'Not configured'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Bank Details</span>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">
+                        {orgBankName || organization?.bankName ? `${orgBankName || organization?.bankName}` : 'Not configured'}
+                      </span>
                     </div>
                   </div>
                 </CardContent>

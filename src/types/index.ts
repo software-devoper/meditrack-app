@@ -14,6 +14,9 @@ export interface Organization {
   gstNumber?: string;
   panNumber?: string;
   drugLicenseNumber?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
   address?: string;
   phone?: string;
   email?: string;

@@ -518,6 +518,9 @@ export async function createClientWorkspace(payload: {
   gstNumber?: string;
   panNumber?: string;
   drugLicenseNumber?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
   address?: string;
   phone?: string;
   email?: string;
@@ -544,6 +547,9 @@ export async function createClientWorkspace(payload: {
     gstNumber: payload.gstNumber || '',
     panNumber: payload.panNumber || '',
     drugLicenseNumber: payload.drugLicenseNumber || '',
+    bankName: payload.bankName || '',
+    accountNumber: payload.accountNumber || '',
+    ifscCode: payload.ifscCode || '',
     address: payload.address || '',
     phone: payload.phone || '',
     email: payload.email || '',
