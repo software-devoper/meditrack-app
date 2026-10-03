@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Skeleton, CardSkeleton, TableSkeleton } from "../../components/ui";
 import { formatCurrency, cn } from "../../lib/utils";
 import { DollarSign, TrendingUp, ShoppingCart, AlertTriangle, ArrowRight, Package, Calendar, Filter, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend } from "recharts";
@@ -81,12 +81,23 @@ export function Dashboard() {
   const [allSales, setAllSales] = useState<any[]>([]);
   const [allPurchases, setAllPurchases] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [inventoryStats, setInventoryStats] = useState({
     categoryData: [] as any[],
   });
 
   useEffect(() => {
     if (!db) return;
+
+    let salesLoaded = false;
+    let purchasesLoaded = false;
+    let productsLoaded = false;
+
+    const checkComplete = () => {
+      if (salesLoaded && purchasesLoaded && productsLoaded) {
+        setLoading(false);
+      }
+    };
 
     // 1. Listen to Sales
     const salesQ = query(collection(db, 'sales'), orderBy('date', 'desc'), limit(1000));
@@ -96,6 +107,8 @@ export function Dashboard() {
         sales.push({ ...doc.data(), id: doc.id, type: 'Sale' });
       });
       setAllSales(sales);
+      salesLoaded = true;
+      checkComplete();
     });
 
     // 2. Listen to Purchases
@@ -106,6 +119,8 @@ export function Dashboard() {
         purchases.push({ ...doc.data(), id: doc.id, type: 'Purchase' });
       });
       setAllPurchases(purchases);
+      purchasesLoaded = true;
+      checkComplete();
     });
 
     // 3. Products (for MRP, Purchase Price & Unit categories)
@@ -127,6 +142,8 @@ export function Dashboard() {
       setInventoryStats({
         categoryData: unitArray,
       });
+      productsLoaded = true;
+      checkComplete();
     });
 
     return () => {
@@ -343,6 +360,84 @@ export function Dashboard() {
 
     return merged.sort((a, b) => b.date - a.date).slice(0, 15);
   }, [filteredSales, filteredPurchases, activityType]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-44" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <div className="flex gap-2.5">
+            <Skeleton className="h-10 w-28 rounded-lg" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
+          </div>
+        </div>
+
+        {/* Pharmacy Banner Skeleton */}
+        <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-64" />
+            </div>
+          </div>
+          <Skeleton className="h-6 w-24 rounded-full" />
+        </div>
+
+        {/* 4 Metric Cards Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+
+        {/* 2 Charts Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card className="p-5 space-y-4">
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-44" />
+                <Skeleton className="h-3 w-60" />
+              </div>
+              <Skeleton className="h-64 w-full rounded-lg" />
+            </Card>
+          </div>
+          <div>
+            <Card className="p-5 space-y-4">
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-64 w-full rounded-lg" />
+            </Card>
+          </div>
+        </div>
+
+        {/* Activity Table Skeleton */}
+        <Card className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3 w-56" />
+            </div>
+            <Skeleton className="h-8 w-44 rounded-lg" />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <tbody>
+                <TableSkeleton rows={5} cols={5} />
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

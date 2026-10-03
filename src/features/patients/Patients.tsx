@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc, orderBy } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { Card, CardContent, CardHeader, CardTitle, Button, Input } from "../../components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, ListItemSkeleton } from "../../components/ui";
 import { 
   Search, Plus, Trash2, Edit2, Phone, MapPin, Mail, Stethoscope, 
   X, Check, UserCheck, AlertCircle, IndianRupee, TrendingUp,
@@ -653,7 +653,7 @@ export function Patients() {
 
             <CardContent className="p-2 space-y-1.5 max-h-[calc(100vh-280px)] overflow-y-auto">
               {loading ? (
-                <div className="p-10 text-center text-sm font-medium text-slate-600 dark:text-slate-400">Loading patient records...</div>
+                <ListItemSkeleton count={5} />
               ) : filteredPatients.length === 0 ? (
                 <div className="p-8 text-center space-y-3">
                   <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-500">

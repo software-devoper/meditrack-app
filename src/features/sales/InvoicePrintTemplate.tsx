@@ -152,13 +152,13 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           width: '100%',
         }}
       >
-        {/* Column 1 (Left, 35% width) - Patient & Prescriber Doctor Details */}
+        {/* Column 1 (Left, 33% width) - Patient & Prescriber Doctor Details */}
         <div 
           style={{
-            width: '35%',
-            minWidth: '35%',
-            maxWidth: '35%',
-            flex: '0 0 35%',
+            width: '33%',
+            minWidth: '33%',
+            maxWidth: '33%',
+            flex: '0 0 33%',
             borderRight: '1px solid #000000',
             padding: '3px 5px',
             display: 'flex',
@@ -211,13 +211,13 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           </div>
         </div>
 
-        {/* Column 2 (Middle, 42% width) - Pharmacy Legal Profile */}
+        {/* Column 2 (Middle, 41% width) - Pharmacy Legal Profile */}
         <div 
           style={{
-            width: '42%',
-            minWidth: '42%',
-            maxWidth: '42%',
-            flex: '0 0 42%',
+            width: '41%',
+            minWidth: '41%',
+            maxWidth: '41%',
+            flex: '0 0 41%',
             borderRight: '1px solid #000000',
             padding: '2px 6px',
             display: 'flex',
@@ -266,13 +266,13 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
           </div>
         </div>
 
-        {/* Column 3 (Right, 23% width) - Pharmacy Owner Bank Details */}
+        {/* Column 3 (Right, 26% width) - Pharmacy Owner Bank Details */}
         <div 
           style={{
-            width: '23%',
-            minWidth: '23%',
-            maxWidth: '23%',
-            flex: '0 0 23%',
+            width: '26%',
+            minWidth: '26%',
+            maxWidth: '26%',
+            flex: '0 0 26%',
             padding: '3px 6px',
             display: 'flex',
             flexDirection: 'column',
@@ -299,27 +299,27 @@ export function InvoicePrintTemplate({ sale }: { sale: any }) {
             BANK DETAILS
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '7.2px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000' }}>
-                Bank Name:
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ fontSize: '7.4px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000', flexShrink: 0, marginRight: '4px' }}>
+                BANK NAME:
               </span>
-              <span style={{ fontWeight: 600, fontSize: '8px', color: '#000000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontWeight: 600, fontSize: '7.6px', color: '#000000', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {bankName}
               </span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '7.2px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000' }}>
-                Account No:
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ fontSize: '7.4px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000', flexShrink: 0, marginRight: '4px' }}>
+                ACCOUNT NO:
               </span>
-              <span style={{ fontWeight: 'bold', fontSize: '8.4px', letterSpacing: '0.3px', color: '#000000' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '8px', letterSpacing: '0.2px', color: '#000000' }}>
                 {accountNumber}
               </span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '7.2px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000' }}>
-                IFSC Code:
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ fontSize: '7.4px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000000', flexShrink: 0, marginRight: '4px' }}>
+                IFSC CODE:
               </span>
-              <span style={{ fontWeight: 'bold', fontSize: '8.4px', textTransform: 'uppercase', letterSpacing: '0.3px', color: '#000000' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '8px', textTransform: 'uppercase', letterSpacing: '0.2px', color: '#000000' }}>
                 {ifscCode}
               </span>
             </div>

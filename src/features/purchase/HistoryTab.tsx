@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { Card, CardContent } from "../../components/ui";
+import { Card, CardContent, TableSkeleton } from "../../components/ui";
 import { formatCurrency } from "../../lib/utils";
 import { format } from "date-fns";
 import { Purchase } from "../../types";
@@ -37,18 +37,22 @@ export function HistoryTab() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {purchases.map(record => (
-                  <tr key={record.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors border-b dark:border-slate-800 last:border-0">
-                    <td className="px-4 py-3 text-center font-medium">
-                      {format(new Date(record.date), 'MMM dd, yyyy hh:mm a')}
-                    </td>
-                    <td className="px-4 py-3 text-center font-semibold text-slate-900 dark:text-slate-100">{record.supplierName}</td>
-                    <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-300">{record.items.length} items</td>
-                    <td className="px-4 py-3 text-center font-bold text-slate-900 dark:text-slate-100">
-                      {formatCurrency(record.grandTotal)}
-                    </td>
-                  </tr>
-                ))}
+                {loading ? (
+                  <TableSkeleton rows={5} cols={4} />
+                ) : (
+                  purchases.map(record => (
+                    <tr key={record.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors border-b dark:border-slate-800 last:border-0">
+                      <td className="px-4 py-3 text-center font-medium">
+                        {format(new Date(record.date), 'MMM dd, yyyy hh:mm a')}
+                      </td>
+                      <td className="px-4 py-3 text-center font-semibold text-slate-900 dark:text-slate-100">{record.supplierName}</td>
+                      <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-300">{record.items.length} items</td>
+                      <td className="px-4 py-3 text-center font-bold text-slate-900 dark:text-slate-100">
+                        {formatCurrency(record.grandTotal)}
+                      </td>
+                    </tr>
+                  ))
+                )}
                 {purchases.length === 0 && !loading && (
                   <tr><td colSpan={4} className="p-8 text-center text-slate-500 dark:text-slate-400">No purchases recorded yet.</td></tr>
                 )}

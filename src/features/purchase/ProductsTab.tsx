@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { collection, query, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Product } from '../../types';
-import { Card, CardContent, Button, Input, Badge } from '../../components/ui';
+import { Card, CardContent, Button, Input, Badge, TableSkeleton } from '../../components/ui';
 import { Search, Plus, Edit2, Trash2, AlertTriangle, ShieldAlert, Layers } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
@@ -159,72 +159,76 @@ export function ProductsTab() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredProducts.map(product => {
-                  const matchingCount = products.filter(
-                    p => (p?.name || '').trim().toLowerCase() === (product?.name || '').trim().toLowerCase()
-                  ).length;
-                  const hasMultipleValues = matchingCount > 1;
+                {loading ? (
+                  <TableSkeleton rows={6} cols={6} />
+                ) : (
+                  filteredProducts.map(product => {
+                    const matchingCount = products.filter(
+                      p => (p?.name || '').trim().toLowerCase() === (product?.name || '').trim().toLowerCase()
+                    ).length;
+                    const hasMultipleValues = matchingCount > 1;
 
-                  return (
-                    <tr key={product.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors border-b dark:border-slate-800 last:border-0">
-                      <td className="px-4 py-3 text-center">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100">{product.name}</p>
-                        
-                        {hasMultipleValues && (
-                          <div className="mt-1.5 flex justify-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedProductForValues(product.name);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-all shadow-xs cursor-pointer active:scale-95"
-                              title="Click to view all rates & suppliers for this product"
+                    return (
+                      <tr key={product.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors border-b dark:border-slate-800 last:border-0">
+                        <td className="px-4 py-3 text-center">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">{product.name}</p>
+                          
+                          {hasMultipleValues && (
+                            <div className="mt-1.5 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedProductForValues(product.name);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:hover:bg-indigo-900/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-all shadow-xs cursor-pointer active:scale-95"
+                                title="Click to view all rates & suppliers for this product"
+                              >
+                                <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                <span>{matchingCount} Different Values</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <p className="font-medium">{format(new Date(product.createdAt || product.updatedAt || Date.now()), 'dd-MM-yyyy')}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{format(new Date(product.createdAt || product.updatedAt || Date.now()), 'hh:mm:ss a')}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <p className="font-medium text-slate-900 dark:text-slate-100">{formatCurrency(product.mrp)}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Buy: {formatCurrency(product.purchasePrice)}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="font-semibold">
+                            {product.stockQty} {product.unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center">{getStatusBadge(product)}</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => setSelectedProductForValues(product.name)}
+                              className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40" 
+                              title={hasMultipleValues ? `View ${matchingCount} Different Values` : "View Values & Pricing Breakdown"}
                             >
-                              <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                              <span>{matchingCount} Different Values</span>
-                            </button>
+                              <Layers className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingProduct(product); setIsModalOpen(true); }} title="Edit">
+                              <Edit2 className="w-4 h-4 text-primary-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product)} className="text-red-600 hover:text-red-700" title="Delete">
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <p className="font-medium">{format(new Date(product.createdAt || product.updatedAt || Date.now()), 'dd-MM-yyyy')}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{format(new Date(product.createdAt || product.updatedAt || Date.now()), 'hh:mm:ss a')}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{formatCurrency(product.mrp)}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Buy: {formatCurrency(product.purchasePrice)}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-semibold">
-                          {product.stockQty} {product.unit}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center">{getStatusBadge(product)}</div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => setSelectedProductForValues(product.name)}
-                            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40" 
-                            title={hasMultipleValues ? `View ${matchingCount} Different Values` : "View Values & Pricing Breakdown"}
-                          >
-                            <Layers className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingProduct(product); setIsModalOpen(true); }} title="Edit">
-                            <Edit2 className="w-4 h-4 text-primary-600" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteProduct(product)} className="text-red-600 hover:text-red-700" title="Delete">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
                 {filteredProducts.length === 0 && !loading && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">

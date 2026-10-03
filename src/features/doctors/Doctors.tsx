@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, query, onSnapshot, doc, setDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Textarea } from "../../components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Textarea, ListItemSkeleton } from "../../components/ui";
 import { Search, Plus, Trash2, Edit2, Phone, MapPin, Mail, Stethoscope, UserCheck, X } from "lucide-react";
 import { Doctor } from "../../types";
 import { toast } from "sonner";
@@ -196,7 +196,9 @@ export function Doctors() {
       <Card className="bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 text-center text-slate-500 dark:text-slate-400">Loading doctor profiles...</div>
+            <div className="p-4">
+              <ListItemSkeleton count={5} />
+            </div>
           ) : filteredDoctors.length === 0 ? (
             <div className="p-12 text-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto text-slate-400">

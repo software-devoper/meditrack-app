@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { collection, getDocs, limit, query, setDoc, doc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../../lib/firebase';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Skeleton } from '../../components/ui';
 import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -73,7 +73,23 @@ export function Bootstrap() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md p-6 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xl">
+          <Skeleton className="w-12 h-12 rounded-full mx-auto" />
+          <Skeleton className="h-6 w-40 mx-auto" />
+          <Skeleton className="h-4 w-64 mx-auto" />
+          <div className="space-y-3 pt-4">
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md mt-2" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!needsBootstrap) {
     return null; // Will redirect in useEffect

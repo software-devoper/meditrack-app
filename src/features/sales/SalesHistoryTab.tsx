@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, orderBy, doc, runTransaction, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Card, CardContent, Button } from '../../components/ui';
+import { Card, CardContent, Button, Skeleton } from '../../components/ui';
 import { FileText, Calendar, User, IndianRupee, Clock, Edit2, Printer, Image, FileDown, Loader2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { EditSaleModal } from './EditSaleModal';
@@ -133,7 +133,34 @@ export function SalesHistoryTab({
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500 dark:text-slate-400">Loading sales history...</div>;
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-5 w-28" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-7 w-24" />
+                <Skeleton className="h-8 w-20 rounded-md" />
+              </div>
+            </div>
+            <div className="p-4 space-y-2 bg-slate-50/50 dark:bg-slate-950/20">
+              <Skeleton className="h-4 w-full max-w-md" />
+              <Skeleton className="h-4 w-3/4 max-w-sm" />
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
   if (sales.length === 0) {
