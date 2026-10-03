@@ -162,12 +162,15 @@ GitHub
 
 * **All auth operations use `firebase-mock.ts` exclusively — no real Firebase Auth SDK calls.**
 * **Methods**:
-  1. **Social Login (Google & Facebook)**: UI prompts for email + display name → resolved against mock `users` collection. NOT real OAuth.
-  2. **Passwordless Email OTP**: User enters email → `sendEmailCode()` issues 6-digit code (stored in memory) → `verifyCode()` validates:
-     * Registered email → Opens existing workspace.
-     * New email → Proceeds to 5-step onboarding.
-  3. **Password-based**: `authenticateWithPassword()` → checks `getStoredPasswords()` from mock engine.
-  4. **5-Step Onboarding**: Nationality → Org Name → Phone → Full Name → Profile Picture → `registerWorkspaceUser()`.
+  1. **Username or Email + Password Sign In**: User enters Username OR Email + Password → authenticated via `authenticateWithPassword()` against mock `users` and `getStoredPasswords()`.
+  2. **Sign Up**: User enters Username (verified unique), Email (verified valid & unique), Password, and Confirm Password (matched).
+  3. **5-Step Onboarding**:
+     * Step 1: Nationality selection (configures country calling code e.g. +91).
+     * Step 2: Pharmacy / Organization Name.
+     * Step 3: Phone Number with automatic country calling code prefix.
+     * Step 4: Full Name.
+     * Step 5: Profile Picture (Upload file, webcam capture, or skip).
+     * Completion: `registerWorkspaceUser()` registers user, stores password, activates workspace, and opens dashboard.
 * **Session Persistence**: Zustand `useAuthStore` → `localStorage` key `meditrack-auth-storage`.
 
 ---

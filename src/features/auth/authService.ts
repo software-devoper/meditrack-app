@@ -27,6 +27,17 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 }
 
 /**
+ * Searches for an existing user by username (case-insensitive)
+ */
+export async function findUserByUsername(username: string): Promise<User | null> {
+  if (!username) return null;
+  const normalized = username.trim().toLowerCase();
+  const users = getCollectionData('users');
+  const matched = users.find((u: User) => u.username && u.username.toLowerCase() === normalized);
+  return matched || null;
+}
+
+/**
  * Returns all registered users from the local storage
  */
 export function getAllRegisteredUsers(): User[] {
@@ -50,7 +61,7 @@ export async function authenticateWithPassword(
   );
 
   if (!matched) {
-    throw new Error('No registered account was found with that email or username.');
+    throw new Error('No registered account was found with that username or email.');
   }
 
   const passwords = getStoredPasswords();
@@ -59,8 +70,14 @@ export async function authenticateWithPassword(
     passwords[matched.internalAuthEmail?.toLowerCase() || ''] || 
     passwords[matched.username?.toLowerCase() || ''];
 
-  if (expectedPass && expectedPass !== password) {
-    throw new Error('Incorrect password. Please verify and try again.');
+  if (expectedPass) {
+    if (expectedPass !== password) {
+      throw new Error('Incorrect password. Please verify and try again.');
+    }
+  } else {
+    // If no password set yet, store it
+    if (matched.username) saveStoredPassword(matched.username, password);
+    if (matched.contactEmail) saveStoredPassword(matched.contactEmail, password);
   }
 
   const org = await findOrganizationById(matched.tenantId);
@@ -100,7 +117,7 @@ export async function findOrganizationById(tenantId?: string): Promise<Organizat
 }
 
 export interface NewWorkspacePayload {
-  authProvider: 'google' | 'facebook' | 'email';
+  username?: string;
   email: string;
   nationality: string;
   countryCode: string;
@@ -109,6 +126,7 @@ export interface NewWorkspacePayload {
   fullName: string;
   avatarUrl?: string;
   password?: string;
+  authProvider?: 'password' | 'google' | 'facebook' | 'email';
 }
 
 /**
@@ -144,16 +162,19 @@ export async function registerWorkspaceUser(payload: NewWorkspacePayload): Promi
   newOrg.ownerId = userId;
   newOrg.ownerName = payload.fullName.trim();
 
-  // Base username from email local part or clean name
-  let baseUsername = normalizedEmail.split('@')[0].replace(/[^a-z0-9_]/g, '');
-  if (!baseUsername) baseUsername = 'user_' + generateMockId().slice(0, 5);
-  
-  // Ensure username uniqueness
-  let username = baseUsername;
-  let counter = 1;
-  while (users.some((u: User) => u.username?.toLowerCase() === username.toLowerCase())) {
-    username = `${baseUsername}${counter++}`;
+  // Use provided username or derive from email
+  let username = payload.username?.trim().toLowerCase();
+  if (!username) {
+    let baseUsername = normalizedEmail.split('@')[0].replace(/[^a-z0-9_]/g, '');
+    if (!baseUsername) baseUsername = 'user_' + generateMockId().slice(0, 5);
+    username = baseUsername;
+    let counter = 1;
+    while (users.some((u: User) => u.username?.toLowerCase() === username.toLowerCase())) {
+      username = `${baseUsername}${counter++}`;
+    }
   }
+
+  const provider = payload.authProvider || 'password';
 
   const newUser: User = {
     id: userId,
@@ -169,12 +190,12 @@ export async function registerWorkspaceUser(payload: NewWorkspacePayload): Promi
     plan: newOrg.plan,
     phone: payload.phone.trim(),
     avatarUrl: payload.avatarUrl || '',
-    authProvider: payload.authProvider,
+    authProvider: provider,
     nationality: payload.nationality,
     countryCode: payload.countryCode,
     registrationCompleted: true,
     createdAt: Date.now(),
-    createdBy: `${payload.authProvider}_registration`,
+    createdBy: `${provider}_registration`,
     emailVerified: true
   };
 

@@ -1,63 +1,88 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowRight, 
   ArrowLeft, 
-  Mail, 
   Camera, 
   Upload, 
   Search, 
-  X, 
   Loader2, 
   Check,
   Building2,
   Phone,
-  User as UserIcon
+  User as UserIcon,
+  Lock,
+  Mail,
+  AlertCircle
 } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { Button, Input } from '../../components/ui';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/useAuthStore';
-import { COUNTRIES, CountryInfo, getDialCodeForNationality } from './countries';
+import { COUNTRIES, getDialCodeForNationality } from './countries';
 import { 
   findUserByEmail, 
-  findOrganizationById, 
+  findUserByUsername,
   registerWorkspaceUser, 
-  sendEmailCode, 
-  verifyCode
+  authenticateWithPassword 
 } from './authService';
-import { switchWorkspace } from '../../lib/firebase-mock';
 import { validateEmail } from '../../lib/emailValidation';
 
-type ScreenState = 
-  | 'initial'
-  | 'more-methods'
-  | 'email-input'
-  | 'email-verify'
-  | 'onboarding';
+type AuthMode = 'signin' | 'signup' | 'onboarding';
 
 export function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, setUser } = useAuthStore();
 
-  // Screen routing state
-  const [screen, setScreen] = useState<ScreenState>('initial');
-  const [hasLoggedOut, setHasLoggedOut] = useState(false);
+  // Mode: Sign In, Sign Up, or Onboarding
+  const [mode, setMode] = useState<AuthMode>(() => 
+    location.pathname === '/signup' ? 'signup' : 'signin'
+  );
 
-  // Email authentication state
-  const [email, setEmail] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
+  // Sync mode with URL if user navigates back/forward
+  useEffect(() => {
+    if (mode !== 'onboarding') {
+      if (location.pathname === '/signup') {
+        setMode('signup');
+      } else if (location.pathname === '/login' || location.pathname === '/auth') {
+        setMode('signin');
+      }
+    }
+  }, [location.pathname]);
 
-  // Social account modal state (Google & Facebook authentication)
-  const [activeSocialProvider, setActiveSocialProvider] = useState<'google' | 'facebook' | null>(null);
-  const [customSocialEmail, setCustomSocialEmail] = useState('');
-  const [customSocialName, setCustomSocialName] = useState('');
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && user.registrationCompleted !== false) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
-  // Unified 5-Step Onboarding state
-  const [onboardingProvider, setOnboardingProvider] = useState<'google' | 'facebook' | 'email'>('google');
-  const [onboardingEmail, setOnboardingEmail] = useState('');
+  // -------------------------------------------------------------
+  // SIGN IN STATE
+  // -------------------------------------------------------------
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // -------------------------------------------------------------
+  // SIGN UP STATE
+  // -------------------------------------------------------------
+  const [signupUsername, setSignupUsername] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
+  const [signupErrors, setSignupErrors] = useState<{
+    username?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    form?: string;
+  }>({});
+
+  // -------------------------------------------------------------
+  // 5-STEP ONBOARDING STATE
+  // -------------------------------------------------------------
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   // Step 1: Nationality
@@ -67,7 +92,7 @@ export function AuthPage() {
   // Step 2: Pharmacy / Organization Name
   const [organizationName, setOrganizationName] = useState('');
 
-  // Step 3: Phone Number (country code automatically resolved from Step 1)
+  // Step 3: Phone Number
   const [phoneNumber, setPhoneNumber] = useState('');
 
   // Step 4: Full Name
@@ -79,34 +104,8 @@ export function AuthPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Global submission loading state
+  // Global loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Check login/logout status on mount
-  useEffect(() => {
-    try {
-      const loggedOut = localStorage.getItem('meditrack_has_logged_out');
-      if (loggedOut === 'true') {
-        setHasLoggedOut(true);
-      }
-    } catch (_) {}
-  }, []);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (user && user.registrationCompleted !== false) {
-      navigate('/');
-    }
-  }, [user, navigate]);
-
-  // Resend code countdown timer
-  useEffect(() => {
-    if (resendTimer <= 0) return;
-    const interval = setInterval(() => {
-      setResendTimer(prev => prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [resendTimer]);
 
   // Clean up camera stream on unmount
   useEffect(() => {
@@ -187,153 +186,143 @@ export function AuthPage() {
     reader.readAsDataURL(file);
   };
 
-  // Trigger Google / Facebook authentication
-  const handleSocialClick = (provider: 'google' | 'facebook') => {
-    setActiveSocialProvider(provider);
-    setCustomSocialEmail('');
-    setCustomSocialName('');
-  };
-
-  // Complete Google / Facebook authentication
-  const handleSocialFormSubmit = async (e: React.FormEvent) => {
+  // -------------------------------------------------------------
+  // SIGN IN SUBMISSION
+  // -------------------------------------------------------------
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = customSocialEmail.trim().toLowerCase();
-    const validation = validateEmail(cleanEmail);
-    if (!validation.isValid) {
-      toast.error(validation.error || 'Please enter a valid email address');
+    setLoginError('');
+
+    const identifier = loginIdentifier.trim();
+    if (!identifier) {
+      setLoginError('Please enter your username or email.');
+      return;
+    }
+    if (!loginPassword) {
+      setLoginError('Please enter your password.');
       return;
     }
 
-    const provider = activeSocialProvider || 'google';
-    setActiveSocialProvider(null);
     setIsSubmitting(true);
-
     try {
-      const existingUser = await findUserByEmail(cleanEmail);
-      if (existingUser && existingUser.registrationCompleted !== false) {
-        // EXISTING USER -> Load account & enter existing workspace directly
-        const org = await findOrganizationById(existingUser.tenantId);
-        try {
-          if (org) switchWorkspace(org.id);
-        } catch (_) {}
-        setUser(existingUser, existingUser.id, org);
+      const { user: authUser, organization: org } = await authenticateWithPassword(identifier, loginPassword);
+      setUser(authUser, authUser.id, org);
+      try {
         localStorage.removeItem('meditrack_has_logged_out');
-        toast.success(`Welcome back, ${existingUser.name || 'User'}!`);
-        navigate('/');
-      } else {
-        // NEW USER -> Begin 5-step onboarding flow
-        setOnboardingProvider(provider);
-        setOnboardingEmail(cleanEmail);
-        if (customSocialName.trim()) {
-          setFullName(customSocialName.trim());
-        }
-        setCurrentStep(1);
-        setScreen('onboarding');
-      }
+      } catch (_) {}
+      toast.success(`Welcome back, ${authUser.name || authUser.username}!`);
+      navigate('/');
     } catch (err: any) {
-      toast.error(err.message || 'Authentication failed. Please try again.');
+      setLoginError(err.message || 'Invalid username/email or password.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Request 6-digit email OTP
-  const handleGetCode = async (e: React.FormEvent) => {
+  // -------------------------------------------------------------
+  // SIGN UP SUBMISSION & VALIDATION
+  // -------------------------------------------------------------
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    const validation = validateEmail(cleanEmail);
-    if (!validation.isValid) {
-      toast.error(validation.error || 'Please enter a valid email address');
+    const newErrors: typeof signupErrors = {};
+
+    const cleanUsername = signupUsername.trim().toLowerCase();
+    const cleanEmail = signupEmail.trim().toLowerCase();
+
+    // Required fields check
+    if (!cleanUsername) {
+      newErrors.username = 'Username is required.';
+    } else if (cleanUsername.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters.';
+    } else if (!/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+      newErrors.username = 'Username can only contain letters, numbers, underscores, and hyphens.';
+    }
+
+    if (!cleanEmail) {
+      newErrors.email = 'Email address is required.';
+    } else {
+      const emailValidation = validateEmail(cleanEmail);
+      if (!emailValidation.isValid) {
+        newErrors.email = emailValidation.error || 'Please enter a valid email address.';
+      }
+    }
+
+    if (!signupPassword) {
+      newErrors.password = 'Password is required.';
+    } else if (signupPassword.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters.';
+    }
+
+    if (!signupConfirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password.';
+    } else if (signupPassword !== signupConfirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match.';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setSignupErrors(newErrors);
       return;
     }
 
     setIsSubmitting(true);
+    setSignupErrors({});
+
     try {
-      sendEmailCode(cleanEmail);
-      setResendTimer(60);
-      setVerificationCode('');
-      setScreen('email-verify');
-
-      toast.success(`Verification code sent to ${cleanEmail}`);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to send verification code. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Verify 6-digit email OTP
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCode = verificationCode.trim();
-    if (cleanCode.length !== 6) {
-      toast.error('Please enter the complete 6-digit verification code');
-      return;
-    }
-
-    setIsVerifying(true);
-    try {
-      const result = verifyCode(email, cleanCode);
-      if (!result.success) {
-        toast.error(result.error || 'Incorrect verification code. Please check and try again.');
-        setIsVerifying(false);
+      // Check username uniqueness
+      const existingUserByUsername = await findUserByUsername(cleanUsername);
+      if (existingUserByUsername) {
+        setSignupErrors({ username: 'Username already exists.' });
+        setIsSubmitting(false);
         return;
       }
 
-      // Check whether this email belongs to an existing registered user
-      const existingUser = await findUserByEmail(email);
-
-      if (existingUser && existingUser.registrationCompleted !== false) {
-        // EXISTING USER -> Enter workspace directly
-        const org = await findOrganizationById(existingUser.tenantId);
-        try {
-          if (org) switchWorkspace(org.id);
-        } catch (_) {}
-        setUser(existingUser, existingUser.id, org);
-        localStorage.removeItem('meditrack_has_logged_out');
-        toast.success(`Welcome back, ${existingUser.name || 'User'}!`);
-        navigate('/');
-      } else {
-        // NEW USER -> Begin 5-step onboarding flow
-        setOnboardingProvider('email');
-        setOnboardingEmail(email.trim().toLowerCase());
-        setCurrentStep(1);
-        setScreen('onboarding');
+      // Check email uniqueness
+      const existingUserByEmail = await findUserByEmail(cleanEmail);
+      if (existingUserByEmail) {
+        setSignupErrors({ email: 'An account with this email already exists.' });
+        setIsSubmitting(false);
+        return;
       }
+
+      // Validation passed -> proceed directly to Onboarding Step 1
+      setIsSubmitting(false);
+      setMode('onboarding');
+      setCurrentStep(1);
     } catch (err: any) {
-      toast.error(err.message || 'Verification failed. Please try again.');
-    } finally {
-      setIsVerifying(false);
+      setSignupErrors({ form: err.message || 'Unable to process sign up. Please try again.' });
+      setIsSubmitting(false);
     }
   };
 
-  // Automatically determine country calling code based on selected nationality in Step 1
+  // Dial code resolved from nationality
   const dialCode = getDialCodeForNationality(selectedNationality);
 
-  // Advance through 5 onboarding steps with validation
+  // -------------------------------------------------------------
+  // ONBOARDING STEP VALIDATION & NAVIGATION
+  // -------------------------------------------------------------
   const handleNextStep = () => {
     if (currentStep === 1) {
       if (!selectedNationality) {
-        toast.error('Please select your nationality');
+        toast.error('Please select your nationality.');
         return;
       }
       setCurrentStep(2);
     } else if (currentStep === 2) {
       if (!organizationName.trim()) {
-        toast.error('Please enter your Pharmacy or Organization name');
+        toast.error('Pharmacy or Organization name is required.');
         return;
       }
       setCurrentStep(3);
     } else if (currentStep === 3) {
       const cleanDigits = phoneNumber.replace(/\D/g, '');
       if (cleanDigits.length < 7) {
-        toast.error('Please enter a valid phone number (at least 7 digits)');
+        toast.error('Please enter a valid phone number (at least 7 digits).');
         return;
       }
       setCurrentStep(4);
     } else if (currentStep === 4) {
       if (!fullName.trim()) {
-        toast.error('Please enter your full name');
+        toast.error('Full Name is required.');
         return;
       }
       setCurrentStep(5);
@@ -342,26 +331,32 @@ export function AuthPage() {
     }
   };
 
-  // Complete registration and enter workspace automatically
+  // -------------------------------------------------------------
+  // COMPLETE REGISTRATION AND ENTER WORKSPACE
+  // -------------------------------------------------------------
   const handleCompleteOnboarding = async () => {
     setIsSubmitting(true);
     try {
       const cleanPhone = phoneNumber.replace(/\D/g, '');
-      const fullPhone = `${dialCode} ${cleanPhone}`;
+      const fullPhone = `${dialCode} ${cleanPhone}`.trim();
 
       const { user: createdUser, organization: createdOrg } = await registerWorkspaceUser({
-        authProvider: onboardingProvider,
-        email: onboardingEmail,
+        username: signupUsername.trim().toLowerCase(),
+        email: signupEmail.trim().toLowerCase(),
+        password: signupPassword,
         nationality: selectedNationality,
         countryCode: dialCode,
         organizationName: organizationName.trim(),
         phone: fullPhone,
         fullName: fullName.trim(),
-        avatarUrl: profilePicture
+        avatarUrl: profilePicture,
+        authProvider: 'password'
       });
 
       setUser(createdUser, createdUser.id, createdOrg);
-      localStorage.removeItem('meditrack_has_logged_out');
+      try {
+        localStorage.removeItem('meditrack_has_logged_out');
+      } catch (_) {}
       toast.success(`Registration complete! Welcome to ${createdOrg.name}`);
       navigate('/');
     } catch (err: any) {
@@ -371,7 +366,7 @@ export function AuthPage() {
     }
   };
 
-  // Filtered countries for nationality search
+  // Filtered countries for Step 1
   const filteredCountries = COUNTRIES.filter(c => {
     if (!nationalitySearch.trim()) return true;
     const q = nationalitySearch.toLowerCase().trim();
@@ -390,216 +385,261 @@ export function AuthPage() {
               MediTrack Pro
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
-            Manage your pharmacy, organization, medicines, and daily operations from one simple workspace.
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
+            {mode === 'signin' && 'Sign in to your pharmacy workspace'}
+            {mode === 'signup' && 'Create your pharmacy workspace account'}
+            {mode === 'onboarding' && 'Complete your pharmacy setup'}
           </p>
         </div>
 
         {/* ---------------------------------------------------- */}
-        {/* PART 1 — INITIAL AUTHENTICATION SCREEN               */}
+        {/* 1. SIGN IN SCREEN                                    */}
         {/* ---------------------------------------------------- */}
-        {screen === 'initial' && (
-          <div className="space-y-3.5">
-            {/* Continue with Google */}
-            <button
-              type="button"
-              onClick={() => handleSocialClick('google')}
-              className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer"
-            >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.28-2.09 3.66-5.17 3.66-9.14z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.04c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.13C3.26 21.43 7.31 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.59H1.24C.45 8.16 0 9.99 0 12s.45 3.84 1.24 5.41l4.04-3.13z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.57 1.24 6.59l4.04 3.13c.95-2.83 3.6-4.97 6.72-4.97z"/>
-              </svg>
-              <span>Continue with Google</span>
-            </button>
-
-            {/* Continue with Facebook */}
-            <button
-              type="button"
-              onClick={() => handleSocialClick('facebook')}
-              className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer"
-            >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#1877F2">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-              <span>Continue with Facebook</span>
-            </button>
-
-            {/* More login methods (ONLY visible for returning/logged-out users) */}
-            {hasLoggedOut && (
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => setScreen('more-methods')}
-                  className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>More login methods</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+        {mode === 'signin' && (
+          <form onSubmit={handleSignIn} className="space-y-4 text-left">
+            {loginError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 flex items-start gap-2.5 text-red-600 dark:text-red-400 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{loginError}</span>
               </div>
             )}
-          </div>
-        )}
 
-        {/* ---------------------------------------------------- */}
-        {/* PART 2 & 7 — MORE LOGIN METHODS (SECONDARY SCREEN)   */}
-        {/* ---------------------------------------------------- */}
-        {screen === 'more-methods' && (
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setScreen('initial')}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mb-1 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-
-            <div className="text-center pb-2">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                More login methods
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Choose an alternative authentication method.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setScreen('email-input')}
-              className="w-full h-11 px-4 flex items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-all shadow-2xs hover:shadow-xs cursor-pointer"
-            >
-              <Mail className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-              <span>Continue with Email</span>
-            </button>
-          </div>
-        )}
-
-        {/* ---------------------------------------------------- */}
-        {/* PART 4 — EMAIL AUTHENTICATION: ENTER EMAIL           */}
-        {/* ---------------------------------------------------- */}
-        {screen === 'email-input' && (
-          <form onSubmit={handleGetCode} className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setScreen(hasLoggedOut ? 'more-methods' : 'initial')}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mb-1 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-
-            <div className="text-center pb-2">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Please enter your email
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                We'll send a 6-digit verification code to sign in or register your workspace.
-              </p>
-            </div>
-
-            <div className="space-y-1.5 text-left">
+            <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Email address <span className="text-red-500">*</span>
+                Username or Email
               </label>
-              <Input
-                type="email"
-                required
-                autoFocus
-                placeholder="doctor@pharmacy.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-11 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
-              />
+              <div className="relative">
+                <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Enter username or email"
+                  value={loginIdentifier}
+                  onChange={(e) => {
+                    setLoginIdentifier(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
+                  className="h-11 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value);
+                    if (loginError) setLoginError('');
+                  }}
+                  className="h-11 pl-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
+                />
+              </div>
             </div>
 
             <Button
               type="submit"
-              disabled={isSubmitting || !email.trim()}
-              className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer"
+              disabled={isSubmitting || !loginIdentifier.trim() || !loginPassword}
+              className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer mt-2"
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Sending Code...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Signing In...
                 </span>
               ) : (
-                'Get Code'
-              )}
-            </Button>
-          </form>
-        )}
-
-        {/* ---------------------------------------------------- */}
-        {/* PART 5 — EMAIL VERIFICATION: VERIFY 6-DIGIT CODE     */}
-        {/* ---------------------------------------------------- */}
-        {screen === 'email-verify' && (
-          <form onSubmit={handleVerifyCode} className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setScreen('email-input')}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mb-1 cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Change email</span>
-            </button>
-
-            <div className="text-center pb-1">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Enter the 6-digit code
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Sent to <strong className="text-slate-800 dark:text-slate-200">{email}</strong>
-              </p>
-            </div>
-
-            <div className="space-y-1.5 text-left">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                6-digit code
-              </label>
-              <Input
-                type="text"
-                maxLength={6}
-                autoFocus
-                placeholder="123456"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                className="h-12 text-center font-mono tracking-widest text-xl font-bold bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={isVerifying || verificationCode.trim().length !== 6}
-              className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer"
-            >
-              {isVerifying ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
-                </span>
-              ) : (
-                'Verify & Continue'
+                'Sign In'
               )}
             </Button>
 
-            <div className="text-center pt-1">
+            <div className="pt-2 text-center">
               <button
                 type="button"
-                disabled={resendTimer > 0}
-                onClick={handleGetCode}
-                className="text-xs font-medium text-slate-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors disabled:opacity-50 cursor-pointer"
+                onClick={() => {
+                  setLoginError('');
+                  setMode('signup');
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
               >
-                {resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend code'}
+                Don't have an account? <span className="font-semibold text-primary-600 dark:text-primary-400 underline">Sign Up</span>
               </button>
             </div>
           </form>
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* PART 6 — 5-STEP ONBOARDING FLOW                      */}
+        {/* 2. SIGN UP SCREEN                                    */}
         {/* ---------------------------------------------------- */}
-        {screen === 'onboarding' && (
+        {mode === 'signup' && (
+          <form onSubmit={handleSignUpSubmit} className="space-y-3.5 text-left">
+            {signupErrors.form && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 flex items-start gap-2.5 text-red-600 dark:text-red-400 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{signupErrors.form}</span>
+              </div>
+            )}
+
+            {/* Username */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Username <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. alexpharm"
+                  value={signupUsername}
+                  onChange={(e) => {
+                    setSignupUsername(e.target.value);
+                    if (signupErrors.username) {
+                      setSignupErrors(prev => ({ ...prev, username: undefined }));
+                    }
+                  }}
+                  className={`h-11 pl-10 text-sm bg-white dark:bg-slate-950 rounded-xl ${
+                    signupErrors.username 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-300 dark:border-slate-700'
+                  }`}
+                />
+              </div>
+              {signupErrors.username && (
+                <p className="text-xs text-red-500 mt-0.5 font-medium">{signupErrors.username}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  type="email"
+                  required
+                  placeholder="doctor@pharmacy.com"
+                  value={signupEmail}
+                  onChange={(e) => {
+                    setSignupEmail(e.target.value);
+                    if (signupErrors.email) {
+                      setSignupErrors(prev => ({ ...prev, email: undefined }));
+                    }
+                  }}
+                  className={`h-11 pl-10 text-sm bg-white dark:bg-slate-950 rounded-xl ${
+                    signupErrors.email 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-300 dark:border-slate-700'
+                  }`}
+                />
+              </div>
+              {signupErrors.email && (
+                <p className="text-xs text-red-500 mt-0.5 font-medium">{signupErrors.email}</p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={signupPassword}
+                  onChange={(e) => {
+                    setSignupPassword(e.target.value);
+                    if (signupErrors.password) {
+                      setSignupErrors(prev => ({ ...prev, password: undefined }));
+                    }
+                  }}
+                  className={`h-11 pl-10 text-sm bg-white dark:bg-slate-950 rounded-xl ${
+                    signupErrors.password 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-300 dark:border-slate-700'
+                  }`}
+                />
+              </div>
+              {signupErrors.password && (
+                <p className="text-xs text-red-500 mt-0.5 font-medium">{signupErrors.password}</p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Confirm Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={signupConfirmPassword}
+                  onChange={(e) => {
+                    setSignupConfirmPassword(e.target.value);
+                    if (signupErrors.confirmPassword) {
+                      setSignupErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                    }
+                  }}
+                  className={`h-11 pl-10 text-sm bg-white dark:bg-slate-950 rounded-xl ${
+                    signupErrors.confirmPassword 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-300 dark:border-slate-700'
+                  }`}
+                />
+              </div>
+              {signupErrors.confirmPassword && (
+                <p className="text-xs text-red-500 mt-0.5 font-medium">{signupErrors.confirmPassword}</p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-11 text-sm font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm transition-all cursor-pointer mt-2"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Validating...
+                </span>
+              ) : (
+                'Sign Up'
+              )}
+            </Button>
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setSignupErrors({});
+                  setMode('signin');
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Already have an account? <span className="font-semibold text-primary-600 dark:text-primary-400 underline">Sign In</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* 3. AFTER SIGN UP — 5-STEP ONBOARDING FLOW           */}
+        {/* ---------------------------------------------------- */}
+        {mode === 'onboarding' && (
           <div className="space-y-5">
             {/* Step Navigation Header */}
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -609,13 +649,13 @@ export function AuthPage() {
                   if (currentStep > 1) {
                     setCurrentStep((prev) => (prev - 1) as any);
                   } else {
-                    setScreen('initial');
+                    setMode('signup');
                   }
                 }}
                 className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>{currentStep === 1 ? 'Cancel' : 'Back'}</span>
+                <span>{currentStep === 1 ? 'Back to Sign Up' : 'Back'}</span>
               </button>
 
               <div className="flex items-center gap-1.5">
@@ -642,10 +682,10 @@ export function AuthPage() {
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your nationality?
+                    Nationality
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Select your nationality to configure your country calling code.
+                    Select your nationality to configure country-specific settings.
                   </p>
                 </div>
 
@@ -701,15 +741,15 @@ export function AuthPage() {
               </div>
             )}
 
-            {/* STEP 2: PHARMACY / ORGANIZATION NAME */}
+            {/* STEP 2: PHARMACY / ORGANIZATION */}
             {currentStep === 2 && (
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your Pharmacy or Organization name?
+                    Pharmacy / Organization
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    This name will appear on your workspace, patient invoices, and sales receipts.
+                    Enter the official name of your pharmacy or organization.
                   </p>
                 </div>
 
@@ -743,15 +783,15 @@ export function AuthPage() {
               </div>
             )}
 
-            {/* STEP 3: PHONE NUMBER (AUTOMATIC COUNTRY CODE) */}
+            {/* STEP 3: PHONE NUMBER */}
             {currentStep === 3 && (
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your phone number?
+                    Phone Number
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Country code <strong className="text-primary-600 dark:text-primary-400">{dialCode}</strong> is automatically assigned from your nationality ({selectedNationality}).
+                    Country calling code <strong className="text-primary-600 dark:text-primary-400">{dialCode}</strong> is automatically assigned from your nationality ({selectedNationality}).
                   </p>
                 </div>
 
@@ -792,10 +832,10 @@ export function AuthPage() {
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    What is your full name?
+                    Full Name
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Your official practitioner or pharmacy owner name.
+                    Enter your official full name as the pharmacy owner/practitioner.
                   </p>
                 </div>
 
@@ -834,10 +874,10 @@ export function AuthPage() {
               <div className="space-y-4 text-left">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Add your profile picture
+                    Profile Picture
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Upload an avatar or take a photo. You can also skip this step.
+                    Upload an avatar or take a photo using your camera. You can also skip this step.
                   </p>
                 </div>
 
@@ -872,7 +912,7 @@ export function AuthPage() {
                       className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      Upload Photo
+                      Upload Picture
                     </Button>
 
                     <Button
@@ -883,7 +923,7 @@ export function AuthPage() {
                       className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      Take Photo
+                      Take Picture
                     </Button>
                   </div>
                 </div>
@@ -955,101 +995,6 @@ export function AuthPage() {
         )}
 
       </div>
-
-      {/* ---------------------------------------------------- */}
-      {/* SOCIAL ACCOUNT MODAL (GOOGLE & FACEBOOK AUTHENTICATION) */}
-      {/* ---------------------------------------------------- */}
-      {activeSocialProvider && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-            
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                {activeSocialProvider === 'google' ? (
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.28-2.09 3.66-5.17 3.66-9.14z"/>
-                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.04c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.13C3.26 21.43 7.31 24 12 24z"/>
-                    <path fill="#FBBC05" d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.59H1.24C.45 8.16 0 9.99 0 12s.45 3.84 1.24 5.41l4.04-3.13z"/>
-                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.57 1.24 6.59l4.04 3.13c.95-2.83 3.6-4.97 6.72-4.97z"/>
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                )}
-                <span className="text-sm font-bold text-slate-900 dark:text-white capitalize">
-                  Continue with {activeSocialProvider}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveSocialProvider(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Sign in with your {activeSocialProvider === 'google' ? 'Google' : 'Facebook'} account:
-            </p>
-
-            <form onSubmit={handleSocialFormSubmit} className="space-y-3 text-left">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="email"
-                  required
-                  autoFocus
-                  placeholder={activeSocialProvider === 'google' ? 'doctor@gmail.com' : 'user@facebook.com'}
-                  value={customSocialEmail}
-                  onChange={(e) => setCustomSocialEmail(e.target.value)}
-                  className="h-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Your Full Name <span className="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <Input
-                  type="text"
-                  placeholder="e.g. Dr. Alex Morgan"
-                  value={customSocialName}
-                  onChange={(e) => setCustomSocialName(e.target.value)}
-                  className="h-10 text-sm bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 rounded-xl"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting} 
-                  className="flex-1 h-10 text-xs font-semibold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-sm cursor-pointer"
-                >
-                  {isSubmitting ? 'Verifying...' : 'Continue'}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setActiveSocialProvider(null);
-                    setCustomSocialEmail('');
-                    setCustomSocialName('');
-                  }} 
-                  className="h-10 text-xs rounded-xl cursor-pointer"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

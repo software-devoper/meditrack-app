@@ -38,7 +38,7 @@ export interface User {
   phone?: string;
   avatarUrl?: string;
   emailVerified?: boolean;
-  authProvider?: 'google' | 'facebook' | 'email';
+  authProvider?: 'password' | 'google' | 'facebook' | 'email';
   nationality?: string;
   countryCode?: string;
   registrationCompleted?: boolean;

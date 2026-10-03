@@ -138,13 +138,13 @@ but those objects are never reached at runtime due to the alias interception.
 
 ## 4. Authentication Architecture
 
-* **Authentication Paradigm**: Mock-based — all auth operations resolved against `firebase-mock.ts` localStorage engine. No real Firebase Auth SDK calls are made.
+* **Authentication Paradigm**: Clean Username / Email + Password Authentication & 5-Step Workspace Onboarding (stored locally via `firebase-mock.ts` engine).
 * **Session Lifecycle**:
   ```text
   User Accesses Application
              │
              ▼
-  App.tsx onAuthStateChanged fires (aliased to mock, effectively no-op)
+  App.tsx onAuthStateChanged fires (mock-backed)
   useAuthStore.isAuthenticated checked (from localStorage)
              │
       ┌──────┴────────────────────────┐
@@ -155,24 +155,16 @@ but those objects are never reached at runtime due to the alias interception.
   Loads User & Workspace       Redirects to /login (AuthPage.tsx)
   from firebase-mock.ts
   ```
-* **Auth Methods (all via firebase-mock.ts)**:
-  1. Email OTP: `sendEmailCode(email)` → 6-digit code in memory → `verifyCode(email, code)` validates
-  2. Social (Google/Facebook): UI prompt for email + name → resolved against mock `users` collection (NOT real OAuth)
-  3. Password-based: `authenticateWithPassword()` → checks `getStoredPasswords()` from mock engine
-* **Auth States in `AuthPage.tsx`**:
-  * `'initial'`: Shows pharmacy intro + Google/Facebook buttons (and "More login methods" if any prior user).
-  * `'more-methods'`: Displays "Continue with Email".
-  * `'email-input'`: Accepts user email address → triggers `sendEmailCode(email)`.
-  * `'email-verify'`: Accepts 6-digit OTP code → verifies code via `verifyCode(email, code)`.
-    * Registered email → Signs in to existing workspace (`/`).
-    * New email → Advances to 5-Step Onboarding Flow.
-  * `'onboarding'`: 5-step registration wizard:
+* **Auth Modes in `AuthPage.tsx`**:
+  * `'signin'`: Minimal Sign In form containing Logo, Username/Email input, Password input, Sign In button, and "Don't have an account? Sign Up" link.
+  * `'signup'`: Sign Up form containing Username (validated unique), Email (validated format & unique), Password, Confirm Password, Sign Up button, and "Already have an account? Sign In" link.
+  * `'onboarding'`: 5-step registration wizard after Sign Up:
     1. Nationality selection
     2. Pharmacy / Organization Name
     3. Phone Number (with auto-assigned calling code prefix e.g. `+91`)
     4. Full Name
     5. Profile Picture (Upload image file, capture live webcam snapshot, or skip)
-    → Calls `registerWorkspaceUser()` → saves User & Organization to mock → redirects to `/`.
+    → Calls `registerWorkspaceUser()` → saves User, Organization, and Passwords to mock → redirects to workspace (`/`).
 
 ---
 
