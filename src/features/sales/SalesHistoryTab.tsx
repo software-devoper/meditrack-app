@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, orderBy, doc, runTransaction, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, doc, runTransaction, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Card, CardContent, Button, Skeleton } from '../../components/ui';
-import { FileText, Calendar, User, IndianRupee, Clock, Edit2, Printer, Image, FileDown, Loader2, Trash2 } from 'lucide-react';
+import { FileText, Calendar, User, IndianRupee, Clock, Edit2, Printer, Image, FileDown, Loader2, Trash2, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { EditSaleModal } from './EditSaleModal';
 import { toast } from 'sonner';
@@ -132,6 +132,19 @@ export function SalesHistoryTab({
     return (Date.now() - date) <= ONE_WEEK_MS;
   };
 
+  const toggleSaleTemplate = async (sale: any) => {
+    const currentType = sale.templateType || 'free';
+    const newType = currentType === 'premium' ? 'free' : 'premium';
+    try {
+      const saleRef = doc(db!, 'sales', sale.id);
+      await updateDoc(saleRef, { templateType: newType });
+      toast.success(`Invoice #${sale.invoiceNo} switched to ${newType === 'premium' ? 'Paid (Premium)' : 'Free (Standard)'} template.`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to update template type");
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -187,6 +200,34 @@ export function SalesHistoryTab({
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <span className="font-bold text-slate-900 dark:text-slate-100 text-lg">{sale.invoiceNo}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSaleTemplate(sale)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all border cursor-pointer ${
+                      sale.templateType === 'premium'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-700 hover:bg-amber-200'
+                        : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100'
+                    }`}
+                    title="Click to switch this bill between Paid (Premium) and Free (Standard)"
+                  >
+                    {sale.templateType === 'premium' ? (
+                      <>
+                        <Sparkles className="w-3 h-3 text-amber-600" />
+                        <span>Paid (Premium)</span>
+                        <span className="text-[10px] text-amber-700 dark:text-amber-300 font-semibold underline ml-1">
+                          ⇄ Switch to Free
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                        <span>Free (Standard)</span>
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold underline ml-1">
+                          ⇄ Switch to Paid
+                        </span>
+                      </>
+                    )}
+                  </button>
                   {valid ? (
                     <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                       Valid for Return

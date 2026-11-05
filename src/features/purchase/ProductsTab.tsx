@@ -105,9 +105,9 @@ export function ProductsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end items-center">
-        <Button onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }} className="gap-2 shadow-sm font-medium">
-          <Plus className="w-4 h-4" /> Add Product
+      <div className="flex justify-end items-center gap-2">
+        <Button onClick={() => { setEditingProduct(undefined); setIsModalOpen(true); }} className="gap-2 shadow-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white">
+          <Plus className="w-4 h-4" /> Add Multiple Products (Row-wise)
         </Button>
       </div>
 

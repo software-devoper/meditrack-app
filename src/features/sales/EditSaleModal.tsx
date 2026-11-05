@@ -4,11 +4,12 @@ import { db } from '../../lib/firebase';
 import { Product, Customer, Doctor } from '../../types';
 import { Button, Input, Card, CardContent } from '../../components/ui';
 import { toast } from 'sonner';
-import { X, Plus, RotateCcw, Stethoscope, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Plus, RotateCcw, Stethoscope, Sparkles, RefreshCw, Scan, Barcode } from 'lucide-react';
 import { ProductAutocomplete } from './ProductAutocomplete';
 import { CustomerAutocomplete } from './CustomerAutocomplete';
 import { DoctorAutocomplete } from './DoctorAutocomplete';
 import { PatientDoctorSelectModal } from './PatientDoctorSelectModal';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
 
 export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => void }) {
   const [customerName, setCustomerName] = useState(sale.patientName || sale.customerName || '');
@@ -165,6 +166,49 @@ export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => voi
         isCustom: true
       }
     ]);
+  };
+
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+
+  const handleBarcodeScanSuccess = (product: Product) => {
+    const emptyIndex = rows.findIndex(r => !r.productId && !r.name.trim());
+    const existingIndex = rows.findIndex(r => r.productId === product.id);
+
+    if (existingIndex !== -1) {
+      const updated = [...rows];
+      updated[existingIndex].qty = Number(updated[existingIndex].qty || 0) + 1;
+      setRows(updated);
+      toast.success(`Incremented quantity for ${product.name}`);
+      return;
+    }
+
+    if (emptyIndex !== -1) {
+      const updated = [...rows];
+      updated[emptyIndex] = {
+        productId: product.id,
+        name: product.name,
+        qty: 1,
+        rate: product.mrp,
+        gstPercent: product.gstPercent || 12,
+        discount: 0,
+        maxQty: product.stockQty || 999,
+        unit: product.unit || 'Strip',
+        isCustom: false
+      };
+      setRows(updated);
+    } else {
+      setRows([...rows, {
+        productId: product.id,
+        name: product.name,
+        qty: 1,
+        rate: product.mrp,
+        gstPercent: product.gstPercent || 12,
+        discount: 0,
+        maxQty: product.stockQty || 999,
+        unit: product.unit || 'Strip',
+        isCustom: false
+      }]);
+    }
   };
 
   // Calculations
@@ -676,6 +720,14 @@ export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => voi
           </div>
           <div className="flex flex-wrap justify-between items-center gap-2">
             <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                onClick={() => setIsBarcodeScannerOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 h-8 text-xs shadow-xs"
+                title="Scan barcode with camera or USB scanner gun"
+              >
+                <Scan className="w-3.5 h-3.5 animate-pulse" /> Scan Barcode
+              </Button>
               <Button variant="outline" size="sm" onClick={addRow}>
                 <Plus className="w-4 h-4 mr-2" /> Add Inventory Item
               </Button>
@@ -723,6 +775,14 @@ export function EditSaleModal({ sale, onClose }: { sale: any; onClose: () => voi
           }}
         />
       )}
+
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={isBarcodeScannerOpen}
+        onClose={() => setIsBarcodeScannerOpen(false)}
+        onScanSuccess={handleBarcodeScanSuccess}
+        products={products}
+      />
     </div>
   );
 }

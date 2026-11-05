@@ -21,6 +21,7 @@ export interface Organization {
   phone?: string;
   email?: string;
   currency?: string;
+  premiumInvoiceCredits?: number;
 }
 
 export interface User {
@@ -167,6 +168,7 @@ export interface Sale {
   date: number;
   createdBy: string;
   status: "completed" | "returned";
+  templateType?: "free" | "premium";
 }
 
 export interface StockLedgerEntry {

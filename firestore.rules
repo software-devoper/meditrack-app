@@ -19,15 +19,21 @@ service cloud.firestore {
     // Metadata: connection test & sales invoice counter
     match /metadata/{metaId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if true;
     }
 
     // Users collection:
-    // Read is allowed so Login can look up username and Setup can check if initial account is required
+    // Read and create allowed for registration and login lookups across preview and production environments
     match /users/{userId} {
       allow read: if true;
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Organizations collection (workspaces)
+    match /organizations/{orgId} {
+      allow read: if true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
 

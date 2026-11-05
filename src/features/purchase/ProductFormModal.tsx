@@ -4,10 +4,11 @@ import { db } from '../../lib/firebase';
 import { Product, Customer } from '../../types';
 import { Button, Input } from '../../components/ui';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, CheckCircle2, Layers, RefreshCw } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle2, Layers, RefreshCw, Scan, Barcode } from 'lucide-react';
 import { ProductSuggestionInput } from './ProductSuggestionInput';
 import { SupplierSuggestionInput } from './SupplierSuggestionInput';
 import { ProductValuesModal } from './ProductValuesModal';
+import { BarcodeScannerModal } from '../sales/BarcodeScannerModal';
 
 interface ProductRow {
   name: string;
@@ -117,6 +118,53 @@ export function ProductFormModal({
   const [suppliers, setSuppliers] = useState<Customer[]>([]);
   const [existingProducts, setExistingProducts] = useState<Product[]>([]);
   const [valuesModalProduct, setValuesModalProduct] = useState<string | null>(null);
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+
+  const handleBarcodeScanSuccess = (scannedProduct: any) => {
+    // Find first empty row (name is empty and mrp is 0)
+    const emptyIndex = rows.findIndex(r => !r.name.trim() && (Number(r.mrp) === 0 || isNaN(Number(r.mrp))));
+    const existingIndex = rows.findIndex(r => 
+      scannedProduct.name && r.name.trim().toLowerCase() === scannedProduct.name.trim().toLowerCase()
+    );
+
+    const calcDiscount = defaultDiscount;
+    const mrp = Number(scannedProduct.mrp) || 0;
+    const purchasePrice = scannedProduct.purchasePrice && Number(scannedProduct.purchasePrice) > 0 
+      ? Number(scannedProduct.purchasePrice)
+      : (mrp > 0 ? Number((mrp * (1 - calcDiscount / 100)).toFixed(2)) : 0);
+
+    const populatedRow: ProductRow = {
+      name: scannedProduct.name || (scannedProduct.barcode ? `Item (${scannedProduct.barcode})` : ''),
+      unit: scannedProduct.unit || 'Strip',
+      stockQty: 10,
+      mrp: mrp,
+      discount: calcDiscount,
+      purchasePrice: purchasePrice,
+      gstPercent: Number(scannedProduct.gstPercent) || defaultGst || 12,
+      supplierName: commonSupplier || scannedProduct.supplierName || '',
+      supplierPhone: commonSupplierPhone || scannedProduct.supplierPhone || ''
+    };
+
+    if (existingIndex !== -1) {
+      const updated = [...rows];
+      updated[existingIndex].stockQty = Number(updated[existingIndex].stockQty || 0) + 10;
+      setRows(updated);
+      toast.success(`Incremented stock quantity for ${scannedProduct.name}`);
+      return;
+    }
+
+    if (emptyIndex !== -1) {
+      const updated = [...rows];
+      updated[emptyIndex] = populatedRow;
+      setRows(updated);
+    } else {
+      setRows([...rows, populatedRow]);
+    }
+
+    if (scannedProduct.name) {
+      toast.success(`Auto-filled: ${scannedProduct.name} (MRP: ₹${mrp}, Purchase: ₹${purchasePrice})`);
+    }
+  };
 
   // Sync defaultGst & defaultDiscount to first row if it's new
   useEffect(() => {
@@ -1014,6 +1062,18 @@ export function ProductFormModal({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {!isEdit && (
+              <Button 
+                type="button" 
+                size="sm" 
+                onClick={() => setIsBarcodeScannerOpen(true)} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 h-8 text-xs shadow-xs"
+                title="Scan product barcode using camera or USB scanner"
+              >
+                <Scan className="w-3.5 h-3.5 animate-pulse" />
+                <span>Scan Barcode</span>
+              </Button>
+            )}
             {!isEdit && hasDraft && (
               <Button type="button" variant="ghost" size="sm" onClick={handleClearDraft} className="text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400">
                 Reset Form
@@ -1295,9 +1355,21 @@ export function ProductFormModal({
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Fill in product details. Discount is calculated on MRP to automatically set Purchase Price. Custom discounts are remembered per supplier. Press <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs font-mono">Enter</kbd> to advance fields.
                 </p>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddRow} className="flex items-center gap-1.5 shrink-0">
-                  <Plus className="w-4 h-4" /> Add Row
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    onClick={() => setIsBarcodeScannerOpen(true)} 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 h-8 text-xs shrink-0 shadow-xs"
+                    title="Scan product barcode using camera or USB scanner"
+                  >
+                    <Scan className="w-3.5 h-3.5 animate-pulse" />
+                    <span>Scan Barcode</span>
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddRow} className="flex items-center gap-1.5 shrink-0">
+                    <Plus className="w-4 h-4" /> Add Row
+                  </Button>
+                </div>
               </div>
 
               <div className="border dark:border-slate-700 rounded-lg overflow-x-auto min-h-[350px] pb-64">
@@ -1486,6 +1558,14 @@ export function ProductFormModal({
             onClose={() => setValuesModalProduct(null)}
           />
         )}
+
+        {/* Barcode & Camera Scanner Modal */}
+        <BarcodeScannerModal
+          isOpen={isBarcodeScannerOpen}
+          onClose={() => setIsBarcodeScannerOpen(false)}
+          onScanSuccess={handleBarcodeScanSuccess}
+          products={existingProducts}
+        />
       </div>
     </div>
   );

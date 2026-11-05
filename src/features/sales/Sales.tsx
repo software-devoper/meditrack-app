@@ -4,6 +4,7 @@ import { NewSaleTab } from './NewSaleTab';
 import { SalesHistoryTab } from './SalesHistoryTab';
 import { ShoppingCart, FileText } from 'lucide-react';
 import { InvoicePrintTemplate } from './InvoicePrintTemplate';
+import { PremiumInvoicePrintTemplate } from './PremiumInvoicePrintTemplate';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
@@ -215,13 +216,23 @@ export function Sales() {
           backgroundColor: '#ffffff',
         }}
       >
-        {captureSale && <InvoicePrintTemplate sale={captureSale} />}
+        {captureSale && (
+          captureSale.templateType === 'premium' ? (
+            <PremiumInvoicePrintTemplate sale={captureSale} />
+          ) : (
+            <InvoicePrintTemplate sale={captureSale} />
+          )
+        )}
       </div>
 
       {/* Dedicated print portal mounted directly on document.body outside of #root */}
       {saleToPrint && createPortal(
         <div id="print-root">
-          <InvoicePrintTemplate sale={saleToPrint} />
+          {saleToPrint.templateType === 'premium' ? (
+            <PremiumInvoicePrintTemplate sale={saleToPrint} />
+          ) : (
+            <InvoicePrintTemplate sale={saleToPrint} />
+          )}
         </div>,
         document.body
       )}

@@ -6,7 +6,7 @@ import { Product, SalesItem, Customer, Doctor, PatientDoctor } from '../../types
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from '../../components/ui';
 import { 
   ShoppingCart, Search, User as UserIcon, Trash2, Printer, Plus, Minus, 
-  FileText, CheckCircle, CheckCircle2, AlertTriangle, CreditCard, Banknote, QrCode, RefreshCw, X, Eye, Stethoscope, Sparkles 
+  FileText, CheckCircle, CheckCircle2, AlertTriangle, CreditCard, Banknote, QrCode, RefreshCw, X, Eye, Stethoscope, Sparkles, Scan, Barcode 
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -15,6 +15,8 @@ import { ProductAutocomplete } from './ProductAutocomplete';
 import { DoctorAutocomplete } from './DoctorAutocomplete';
 import { PatientDoctorSelectModal } from './PatientDoctorSelectModal';
 import { NewCustomerDoctorModal } from './NewCustomerDoctorModal';
+import { BillTemplateModal } from './BillTemplateModal';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { useAlertModal } from '../../context/AlertModalContext';
 
 interface SaleRow {
@@ -60,13 +62,58 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
   const location = useLocation();
   const [invoiceNo, setInvoiceNo] = useState("HCP-0");
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  const [isBillTemplateModalOpen, setIsBillTemplateModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [salesCustomers, setSalesCustomers] = useState<Customer[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Customer | null>(null);
   const [isDoctorSelectModalOpen, setIsDoctorSelectModalOpen] = useState(false);
   const [isNewCustomerDoctorModalOpen, setIsNewCustomerDoctorModalOpen] = useState(false);
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
   const [hasPromptedNewCustomerDoctorFor, setHasPromptedNewCustomerDoctorFor] = useState<string | null>(null);
+
+  const handleBarcodeScanSuccess = (product: Product) => {
+    const emptyIndex = rows.findIndex(r => !r.productId && !r.name.trim());
+    const existingIndex = rows.findIndex(r => r.productId === product.id);
+
+    if (existingIndex !== -1) {
+      const updated = [...rows];
+      updated[existingIndex].qty += 1;
+      setRows(updated);
+      toast.success(`Incremented quantity for ${product.name}`);
+      return;
+    }
+
+    if (emptyIndex !== -1) {
+      const updated = [...rows];
+      updated[emptyIndex] = {
+        productId: product.id,
+        name: product.name,
+        qty: 1,
+        rate: product.mrp,
+        purchasePrice: product.purchasePrice || 0,
+        gstPercent: product.gstPercent || 12,
+        discount: 0,
+        maxQty: product.stockQty || 999,
+        unit: product.unit || 'Strip',
+        isCustom: false
+      };
+      setRows(updated);
+    } else {
+      setRows([...rows, {
+        productId: product.id,
+        name: product.name,
+        qty: 1,
+        rate: product.mrp,
+        purchasePrice: product.purchasePrice || 0,
+        gstPercent: product.gstPercent || 12,
+        discount: 0,
+        maxQty: product.stockQty || 999,
+        unit: product.unit || 'Strip',
+        isCustom: false
+      }]);
+    }
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('meditrack_sale_draft');
@@ -803,7 +850,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
     }, 50);
   };
 
-  const confirmCheckout = async () => {
+  const confirmCheckout = async (templateType: 'free' | 'premium' = 'free') => {
     const validRows = rows.filter(r => ((r.productId && r.productId !== '') || r.isCustom) && r.name.trim() && r.qty > 0 && r.rate > 0);
     if (validRows.length === 0 || !db || !user) return;
 
@@ -850,7 +897,8 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
         paymentMode,
         date: Date.now(),
         createdBy: user.username,
-        status: "completed"
+        status: "completed",
+        templateType,
       };
 
       await runTransaction(db, async (transaction) => {
@@ -1014,14 +1062,13 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
     }
   };
 
-  // Shortcut: F4 for quick print even without adding Additional Bill Notes & Information
+  // Shortcut: F4 for quick print - opens Bill Template selection dialog
   useEffect(() => {
     const handleGlobalF4KeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F4') {
         e.preventDefault();
         if (isBillReady && !isProcessing) {
-          toast.info("Triggering Quick Print (F4)...");
-          confirmCheckout();
+          setIsBillTemplateModalOpen(true);
         } else if (!isBillReady) {
           if (!rows.some(r => r.productId && r.qty > 0)) {
             toast.error("Quick Print (F4) disabled: Please select at least one medicine with valid quantity.");
@@ -1262,6 +1309,14 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => setIsBarcodeScannerOpen(true)} 
+              size="sm" 
+              className="flex items-center gap-1.5 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+              title="Scan product barcode with phone camera or USB scanner gun"
+            >
+              <Scan className="w-3.5 h-3.5 animate-pulse" /> Scan Barcode
+            </Button>
             <Button onClick={handleAddRow} size="sm" variant="outline" className="flex items-center gap-1.5 h-8 text-xs">
               <Plus className="w-4 h-4" /> Add Inventory Product
             </Button>
@@ -1534,7 +1589,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
-                  onClick={confirmCheckout}
+                  onClick={() => setIsBillTemplateModalOpen(true)}
                   disabled={!isBillReady || isProcessing}
                   className="h-8 px-3 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center gap-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
                   title={isBillReady ? "Quick Print Bill directly (F4)" : "Quick Print (F4) is disabled until a product and 10-digit phone number are entered"}
@@ -1840,7 +1895,7 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
               <Button variant="outline" onClick={() => setShowInvoicePreview(false)}>Cancel</Button>
               <Button 
                 id="confirm-print-invoice-btn"
-                onClick={confirmCheckout} 
+                onClick={() => setIsBillTemplateModalOpen(true)} 
                 disabled={isProcessing}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
@@ -1923,6 +1978,27 @@ export function NewSaleTab({ onPrint }: { onPrint?: (sale: any) => void }) {
           }}
         />
       )}
+
+      {/* Bill Template Selection & Credit Top-Up Modal */}
+      <BillTemplateModal
+        isOpen={isBillTemplateModalOpen}
+        onClose={() => setIsBillTemplateModalOpen(false)}
+        onConfirmPrint={(selectedTemplateType) => {
+          setIsBillTemplateModalOpen(false);
+          confirmCheckout(selectedTemplateType);
+        }}
+        isProcessing={isProcessing}
+      />
+
+      {/* Barcode & Camera Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={isBarcodeScannerOpen}
+        onClose={() => setIsBarcodeScannerOpen(false)}
+        onScanSuccess={(prod) => {
+          handleBarcodeScanSuccess(prod);
+        }}
+        products={products}
+      />
 
     </div>
   );

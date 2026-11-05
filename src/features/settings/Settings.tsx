@@ -30,11 +30,18 @@ import {
   RefreshCw,
   Layers,
   ArrowRight,
+  Database,
   X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAppUpdate } from '../../hooks/useAppUpdate';
 import { toast } from 'sonner';
+import { 
+  firebaseConfig, 
+  isFirebaseConfigured, 
+  saveCustomFirebaseConfig, 
+  clearCustomFirebaseConfig 
+} from '../../lib/firebase';
 import { 
   getOrganizations, 
   getWorkspaceMembers, 
@@ -91,6 +98,8 @@ export function Settings() {
   const [memberRole, setMemberRole] = useState<Role>('pharmacist');
   const [memberPhone, setMemberPhone] = useState('');
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
+  const [dbConfigInput, setDbConfigInput] = useState('');
 
   const activeTenantId = organization?.id || user?.tenantId || 'tenant_apex';
 
@@ -873,6 +882,73 @@ export function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Cloud Database Connection Card */}
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-xs">
+            <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-primary-500" />
+                  <CardTitle className="text-base font-bold text-slate-900 dark:text-white">
+                    Cloud Database & Firebase Sync
+                  </CardTitle>
+                </div>
+                {isFirebaseConfigured ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Cloud Database Active
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 text-amber-600" /> Offline / Local Storage
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-500 dark:text-slate-400 block mb-1">Target Firebase Project:</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
+                    {firebaseConfig.projectId || 'None (Using Local Mode)'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-500 dark:text-slate-400 block mb-1">Auth Domain:</span>
+                  <span className="font-mono font-medium text-slate-800 dark:text-slate-200 text-xs">
+                    {firebaseConfig.authDomain || 'Local Mock Auth'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button
+                  onClick={() => {
+                    setDbConfigInput(JSON.stringify(firebaseConfig, null, 2));
+                    setIsDbConfigOpen(true);
+                  }}
+                  className="bg-primary-600 hover:bg-primary-700 text-white gap-2 text-xs font-bold"
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  Connect / Update Firebase Credentials
+                </Button>
+
+                {isFirebaseConfigured && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (confirm("Disconnect and clear custom Firebase config?")) {
+                        clearCustomFirebaseConfig();
+                        toast.info("Firebase custom credentials cleared");
+                      }
+                    }}
+                    className="text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
+                  >
+                    Disconnect Database
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -983,6 +1059,64 @@ export function Settings() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: FIREBASE DATABASE CONFIGURATION */}
+      {isDbConfigOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-700 shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Database className="w-5 h-5 text-primary-500" />
+                Configure Firebase Database
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsDbConfigOpen(false)}
+                className="h-8 w-8 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+              Paste your Firebase Web App configuration JSON from Firebase Console (Project Settings ➔ General ➔ Your apps):
+            </p>
+
+            <textarea
+              rows={8}
+              value={dbConfigInput}
+              onChange={(e) => setDbConfigInput(e.target.value)}
+              placeholder={`{\n  "apiKey": "AIzaSy...",\n  "authDomain": "...",\n  "projectId": "...",\n  "storageBucket": "...",\n  "messagingSenderId": "...",\n  "appId": "..."\n}`}
+              className="w-full font-mono text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 mb-4 focus:ring-2 focus:ring-primary-500 focus:outline-hidden"
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsDbConfigOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  try {
+                    const parsed = JSON.parse(dbConfigInput);
+                    if (!parsed.projectId || !parsed.apiKey) {
+                      toast.error("Invalid configuration: apiKey and projectId are required.");
+                      return;
+                    }
+                    saveCustomFirebaseConfig(parsed);
+                    toast.success("Firebase configuration saved! Reloading application...");
+                  } catch (_) {
+                    toast.error("Please enter a valid JSON object.");
+                  }
+                }}
+                className="bg-primary-600 text-white font-bold"
+              >
+                Save & Connect
+              </Button>
+            </div>
           </div>
         </div>
       )}

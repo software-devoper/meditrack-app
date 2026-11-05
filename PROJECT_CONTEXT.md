@@ -9,7 +9,7 @@
 * **Major Features**:
   1. **Authentication & Onboarding**: Passwordless 6-digit Email OTP verification, simulated Google & Facebook social authentication (resolved locally via mock engine, not real OAuth), password-based login, 5-step interactive workspace onboarding flow (Nationality, Pharmacy Name, Phone with auto country calling code, Full Name, Profile Picture upload & webcam capture).
   2. **Dashboard & Analytics**: Real-time POS sales counters, purchase expenditure metrics, low stock warnings, reorder alerts, stock valuation, and activity audit feed.
-  3. **Point of Sale (POS) & Billing**: Fast barcode/autocomplete billing, batch price lookups, GST calculations, custom discounts, invoice PDF rendering & print modal, Pharmacy Owner Bank Details (Bank Name, Account No, IFSC Code) and Drug License Number integration (configured via Settings / Client Workspace & Staff), credit/due tracking, and sales history.
+  3. **Point of Sale (POS) & Billing**: Fast barcode/autocomplete billing, batch price lookups, GST calculations, custom discounts, invoice PDF/JPG rendering & print modal, Pharmacy Owner Bank Details (Bank Name, Account No, IFSC Code) and Drug License Number integration (configured via Settings / Client Workspace & Staff), Bill Template Selection Dialog with Free Standard Bill (unlimited free forever) and Premium GST Sales Invoice (₹2 per bill generator with live credit purchases, full payment verification, UPI/Cards/Net Banking), credit/due tracking, and sales history.
   4. **Inventory & Purchase Orders**: Stock purchase entry, supplier bill logging, batch stock ledger updates, low-stock reorder thresholds, rack locations, and MRP vs Purchase Price calculations.
   5. **Patient & Customer Management**: Patient directory, contact records, default discounts, medical history logs, outstanding balances, and associated doctor prescribers.
   6. **Supplier Management**: Vendor directory, GST numbers, outstanding payables, and bill history.
@@ -210,8 +210,9 @@ POS Sales & Billing Terminal
 ├── src/features/sales/PatientDoctorSelectModal.tsx
 ├── src/features/sales/NewCustomerDoctorModal.tsx  [previously undocumented]
 ├── src/features/sales/InvoicePrintTemplate.tsx
-├── src/assets/phonepeQrData.ts
-└── src/assets/phonepe-qr.png
+├── src/features/sales/PremiumInvoicePrintTemplate.tsx
+├── src/features/sales/BillTemplateModal.tsx
+├── src/store/usePremiumBillStore.ts
 
 Inventory & Purchase Management
 ├── src/features/purchase/Purchase.tsx

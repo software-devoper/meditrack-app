@@ -94,20 +94,7 @@ export default function App() {
     return () => unsub();
   }, [setUser]);
 
-  if (!isFirebaseConfigured) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-white">
-        <div className="max-w-md text-center space-y-4">
-          <h1 className="text-3xl font-bold text-red-500">Firebase Required</h1>
-          <p className="text-slate-300">
-            Please configure Firebase credentials in your <code>.env</code> file to run this application. 
-            MediTrack Pro requires Firestore and Firebase Auth to function.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
+  // App runs smoothly with local persistence & optional Firebase sync
   if (!authResolved) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">Loading...</div>;
 
   return (
